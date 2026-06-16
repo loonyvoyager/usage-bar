@@ -14,6 +14,7 @@ import SwiftUI
 
 struct UsagePopoverView: View {
     @ObservedObject var store: UsageStore
+    @ObservedObject var settings: AppSettings
 
     var onRefresh: () -> Void
     var onLogin: () -> Void
@@ -23,7 +24,7 @@ struct UsagePopoverView: View {
     private let warnThreshold = 80
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             header
 
             switch store.state {
@@ -38,9 +39,11 @@ struct UsagePopoverView: View {
             }
 
             Divider()
+            menuBarModeRow
             footer
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
         .frame(width: 300, alignment: .leading)
     }
 
@@ -96,7 +99,7 @@ struct UsagePopoverView: View {
 
     private func loadedBody(_ usage: Usage) -> some View {
         let sessionSeries = store.history.map { Double($0.sessionPercent) }
-        return VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 8) {
             usageBlock(title: "Session",
                        percent: usage.sessionPercent,
                        reset: usage.sessionReset)
@@ -113,7 +116,7 @@ struct UsagePopoverView: View {
 
             if let models = usage.perModel, !models.isEmpty {
                 Divider()
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("By model").font(.caption).foregroundStyle(.secondary)
                     ForEach(models) { model in
                         HStack {
@@ -154,12 +157,12 @@ struct UsagePopoverView: View {
 
     private func usageBlock(title: String, percent: Int, reset: Date?) -> some View {
         let warn = percent >= warnThreshold
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Text("\(percent)%")
-                    .font(.title2).fontWeight(.semibold).monospacedDigit()
+                    .font(.title3).fontWeight(.semibold).monospacedDigit()
                     .foregroundStyle(warn ? .orange : .primary)
             }
             ProgressView(value: Double(percent), total: 100)
@@ -175,12 +178,12 @@ struct UsagePopoverView: View {
     // MARK: - Credits (pay-as-you-go "extra usage")
 
     private func creditsBlock(_ credits: CreditUsage) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Credits").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Text(money(credits.used, credits.currency))
-                    .font(.title2).fontWeight(.semibold).monospacedDigit()
+                    .font(.title3).fontWeight(.semibold).monospacedDigit()
             }
             ProgressView(value: min(credits.used, credits.limit),
                          total: max(credits.limit, 0.01))
@@ -195,21 +198,29 @@ struct UsagePopoverView: View {
     @ViewBuilder
     private func sparklineSection(_ values: [Double], warn: Bool) -> some View {
         if values.count >= 2 {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Session history")
-                        .font(.caption2).foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(values.count) pts")
-                        .font(.caption2).foregroundStyle(.tertiary)
-                }
-                SparklineView(values: values, lineColor: warn ? .orange : .accentColor)
-                    .frame(height: 34)
-                    .accessibilityLabel("Session usage trend over recent samples")
-            }
+            SparklineView(values: values, lineColor: warn ? .orange : .accentColor)
+                .frame(height: 22)
+                .accessibilityLabel("Session usage trend over recent samples")
         } else {
             Text("Session history — collecting (refresh to add points)")
                 .font(.caption2).foregroundStyle(.tertiary)
+        }
+    }
+
+    // MARK: - Menu bar mode
+
+    private var menuBarModeRow: some View {
+        HStack(spacing: 6) {
+            Text("Menu bar").font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Picker("", selection: $settings.menuBarMode) {
+                ForEach(MenuBarMode.allCases) { mode in
+                    Text(mode.label).tag(mode)
+                }
+            }
+            .labelsHidden()
+            .controlSize(.small)
+            .fixedSize()
         }
     }
 

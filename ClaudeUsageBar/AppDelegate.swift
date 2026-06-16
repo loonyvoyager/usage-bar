@@ -17,14 +17,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = UsageStore()
     private let session = ClaudeSession()
 
+    private let settings = AppSettings()
+
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private var loginWindow: NSWindow?
     private var refreshTimer: Timer?
+    private var displayTimer: Timer?
 
-    // Phase 4 will make these settings; sensible Phase 0 defaults.
+    // Phase 4 will make this a setting; sensible default.
     private let refreshInterval: TimeInterval = 300   // 5 min
-    private let showLabel = true
 
     // MARK: - Lifecycle
 
@@ -34,7 +36,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupStatusItem()
         setupPopover()
+        settings.onChange = { [weak self] in self?.updateButton() }
         startRefreshTimer()
+        startDisplayTimer()
 
         // Bounded launch-time session check (the only allowed blocking-ish wait).
         store.setState(.loading)
@@ -67,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.behavior = .transient
         let root = UsagePopoverView(
             store: store,
+            settings: settings,
             onRefresh: { [weak self] in self?.refresh() },
             onLogin:   { [weak self] in self?.showLogin() },
             onQuit:    { [weak self] in self?.quit() }
@@ -95,6 +100,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refreshTimer = Timer.scheduledTimer(timeInterval: refreshInterval,
                                             target: self,
                                             selector: #selector(timerFired),
+                                            userInfo: nil,
+                                            repeats: true)
+    }
+
+    /// Re-render the menu-bar label every minute so the "% / time left" mode's
+    /// countdown stays current between (5-min) network refreshes. No network.
+    @objc private func displayTick() { updateButton() }
+
+    private func startDisplayTimer() {
+        displayTimer?.invalidate()
+        displayTimer = Timer.scheduledTimer(timeInterval: 60,
+                                            target: self,
+                                            selector: #selector(displayTick),
                                             userInfo: nil,
                                             repeats: true)
     }
@@ -175,21 +193,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let button = statusItem.button else { return }
         switch store.state {
         case .loaded(let usage):
-            button.title = showLabel ? " \(usage.sessionPercent)%" : ""
-            button.image = NSImage(systemSymbolName: symbolName(for: usage.sessionPercent),
-                                   accessibilityDescription: "Claude usage \(usage.sessionPercent)%")
+            renderLoaded(button, usage)
         case .loading:
+            button.imagePosition = .imageOnly
             button.title = ""
             button.image = NSImage(systemSymbolName: "gauge.medium", accessibilityDescription: "Loading")
         case .needsLogin:
+            button.imagePosition = .imageOnly
             button.title = ""
             button.image = NSImage(systemSymbolName: "person.crop.circle.badge.questionmark",
                                    accessibilityDescription: "Sign in")
         case .error:
+            button.imagePosition = .imageOnly
             button.title = ""
             button.image = NSImage(systemSymbolName: "exclamationmark.triangle",
                                    accessibilityDescription: "Error")
         }
+    }
+
+    /// Render the loaded state per the user's chosen menu-bar mode.
+    private func renderLoaded(_ button: NSStatusBarButton, _ usage: Usage) {
+        switch settings.menuBarMode {
+        case .iconPercent:
+            button.image = NSImage(systemSymbolName: symbolName(for: usage.sessionPercent),
+                                   accessibilityDescription: "Claude usage \(usage.sessionPercent)%")
+            button.imagePosition = .imageLeading
+            button.title = " \(usage.sessionPercent)%"
+        case .percentTime:
+            button.image = nil
+            button.imagePosition = .noImage
+            if let left = timeLeft(usage.sessionReset) {
+                button.title = "\(usage.sessionPercent)%/\(left)"
+            } else {
+                button.title = "\(usage.sessionPercent)%"
+            }
+        }
+    }
+
+    /// Compact "time until session reset", e.g. "3h29m", "29m", "1d3h".
+    private func timeLeft(_ reset: Date?) -> String? {
+        guard let reset, reset > Date() else { return nil }
+        let total = Int(reset.timeIntervalSinceNow)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        if hours >= 24 { return "\(hours / 24)d\(hours % 24)h" }
+        if hours > 0 { return "\(hours)h\(minutes)m" }
+        return "\(minutes)m"
     }
 
     private func symbolName(for percent: Int) -> String {

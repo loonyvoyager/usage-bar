@@ -100,3 +100,41 @@ final class UsageStore: ObservableObject {
         return history.last
     }
 }
+
+/// How the menu-bar status item renders the current session usage.
+enum MenuBarMode: String, CaseIterable, Identifiable {
+    /// Gauge icon + "14%".
+    case iconPercent
+    /// "14%/3h29m" text, no icon.
+    case percentTime
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .iconPercent: return "Icon + %"
+        case .percentTime: return "% / time left"
+        }
+    }
+}
+
+/// Small persisted user settings (UserDefaults). Phase 4 will grow this.
+@MainActor
+final class AppSettings: ObservableObject {
+    @Published var menuBarMode: MenuBarMode {
+        didSet {
+            UserDefaults.standard.set(menuBarMode.rawValue, forKey: Keys.menuBarMode)
+            onChange?()
+        }
+    }
+
+    /// Fired after a setting changes (e.g. so AppDelegate can re-render the bar).
+    /// Not called during init (didSet doesn't run on initial assignment).
+    var onChange: (() -> Void)?
+
+    private enum Keys { static let menuBarMode = "menuBarMode" }
+
+    init() {
+        let raw = UserDefaults.standard.string(forKey: Keys.menuBarMode)
+        menuBarMode = raw.flatMap(MenuBarMode.init(rawValue:)) ?? .iconPercent
+    }
+}
