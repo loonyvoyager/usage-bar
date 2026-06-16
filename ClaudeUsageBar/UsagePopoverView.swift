@@ -20,8 +20,8 @@ struct UsagePopoverView: View {
     var onLogin: () -> Void
     var onQuit: () -> Void
 
-    /// Over this, the bar/label tints to a warning color (Phase 4 makes it a setting).
-    private let warnThreshold = 80
+    /// Over this, the bar/label tints to a warning color. Sourced from settings.
+    private var warnThreshold: Int { settings.warnThreshold }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
