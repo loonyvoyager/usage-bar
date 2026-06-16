@@ -11,6 +11,7 @@
 
 import Foundation
 import Combine
+import ServiceManagement
 
 /// One model's slice of usage (e.g. Opus vs Sonnet). Phase 2 / optional.
 struct ModelUsage: Identifiable, Equatable {
@@ -103,6 +104,8 @@ final class UsageStore: ObservableObject {
 
 /// How the menu-bar status item renders the current session usage.
 enum MenuBarMode: String, CaseIterable, Identifiable {
+    /// Gauge icon only, no text.
+    case iconOnly
     /// Gauge icon + "14%".
     case iconPercent
     /// "14%/3h29m" text, no icon.
@@ -111,13 +114,14 @@ enum MenuBarMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
+        case .iconOnly: return "Icon only"
         case .iconPercent: return "Icon + %"
         case .percentTime: return "% / time left"
         }
     }
 }
 
-/// Small persisted user settings (UserDefaults). Phase 4 will grow this.
+/// Small persisted user settings (UserDefaults). Grown in Phase 4.
 @MainActor
 final class AppSettings: ObservableObject {
     @Published var menuBarMode: MenuBarMode {
@@ -127,14 +131,73 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    /// Fired after a setting changes (e.g. so AppDelegate can re-render the bar).
-    /// Not called during init (didSet doesn't run on initial assignment).
+    /// Network refresh cadence, in minutes (see `refreshChoices`).
+    @Published var refreshIntervalMinutes: Int {
+        didSet {
+            UserDefaults.standard.set(refreshIntervalMinutes, forKey: Keys.refreshIntervalMinutes)
+            onChange?()
+        }
+    }
+
+    /// Session % at/over which the bar + popover tint to a warning color.
+    @Published var warnThreshold: Int {
+        didSet {
+            UserDefaults.standard.set(warnThreshold, forKey: Keys.warnThreshold)
+            onChange?()
+        }
+    }
+
+    /// Mirrors SMAppService registration (which is the real source of truth).
+    @Published var launchAtLogin: Bool {
+        didSet {
+            LaunchAtLogin.set(launchAtLogin)
+            onChange?()
+        }
+    }
+
+    /// Refresh cadences (minutes) offered by the settings UI.
+    static let refreshChoices = [1, 5, 15, 30]
+
+    /// Fired after a setting changes (e.g. so AppDelegate can re-render the bar /
+    /// restart the timer). Not called during init (didSet skips initial assignment).
     var onChange: (() -> Void)?
 
-    private enum Keys { static let menuBarMode = "menuBarMode" }
+    private enum Keys {
+        static let menuBarMode = "menuBarMode"
+        static let refreshIntervalMinutes = "refreshIntervalMinutes"
+        static let warnThreshold = "warnThreshold"
+    }
 
     init() {
-        let raw = UserDefaults.standard.string(forKey: Keys.menuBarMode)
-        menuBarMode = raw.flatMap(MenuBarMode.init(rawValue:)) ?? .iconPercent
+        let defaults = UserDefaults.standard
+
+        let rawMode = defaults.string(forKey: Keys.menuBarMode)
+        menuBarMode = rawMode.flatMap(MenuBarMode.init(rawValue:)) ?? .iconPercent
+
+        let storedInterval = defaults.integer(forKey: Keys.refreshIntervalMinutes)   // 0 when unset
+        refreshIntervalMinutes = Self.refreshChoices.contains(storedInterval) ? storedInterval : 5
+
+        let storedThreshold = defaults.integer(forKey: Keys.warnThreshold)            // 0 when unset
+        warnThreshold = (50...95).contains(storedThreshold) ? storedThreshold : 80
+
+        // Launch-at-login's source of truth is SMAppService, not UserDefaults.
+        launchAtLogin = LaunchAtLogin.isEnabled
+    }
+}
+
+/// Thin wrapper over SMAppService for "launch at login" (macOS 13+).
+enum LaunchAtLogin {
+    static var isEnabled: Bool { SMAppService.mainApp.status == .enabled }
+
+    static func set(_ enabled: Bool) {
+        do {
+            if enabled, SMAppService.mainApp.status != .enabled {
+                try SMAppService.mainApp.register()
+            } else if !enabled, SMAppService.mainApp.status == .enabled {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            NSLog("LaunchAtLogin toggle failed: \(error.localizedDescription)")
+        }
     }
 }
