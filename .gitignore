@@ -1,0 +1,13 @@
+# Xcode / build artifacts
+build/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+*.xcworkspace/xcuserdata/
+**/xcuserdata/
+
+# macOS
+.DS_Store
+
+# Endpoint notes may contain a real org UUID — uncomment if you paste one in.
+# ENDPOINT_NOTES.md
