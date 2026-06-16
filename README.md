@@ -90,7 +90,7 @@ degrades to a graceful error rather than a crash.
   correctly (see `ENDPOINT_NOTES.md`); dead candidates removed.
 - **Phase 2 — Extended data:** ✅ weekly + per-model (Opus/Sonnet) render
   conditionally, a last-updated stamp, and a session-history sparkline
-  (auto-scaled, drawn from the in-memory ring buffer). Optional later:
-  surface `extra_usage` credits.
+  (auto-scaled, drawn from the in-memory ring buffer), and a Credits row for
+  the `extra_usage` pay-as-you-go pool (hidden when not enabled).
 
 See the roadmap in `CLAUDE_CODE_BRIEF.md` §5 for later phases.

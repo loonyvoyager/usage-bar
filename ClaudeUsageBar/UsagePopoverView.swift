@@ -125,6 +125,11 @@ struct UsagePopoverView: View {
                 }
             }
 
+            if let credits = usage.credits {
+                Divider()
+                creditsBlock(credits)
+            }
+
             Text("Updated \(timeStamp(usage.capturedAt))")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
@@ -164,6 +169,24 @@ struct UsagePopoverView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    // MARK: - Credits (pay-as-you-go "extra usage")
+
+    private func creditsBlock(_ credits: CreditUsage) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Credits").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Text(money(credits.used, credits.currency))
+                    .font(.title2).fontWeight(.semibold).monospacedDigit()
+            }
+            ProgressView(value: min(credits.used, credits.limit),
+                         total: max(credits.limit, 0.01))
+            Text("of \(money(credits.limit, credits.currency)) this month")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -228,6 +251,17 @@ struct UsagePopoverView: View {
         f.timeStyle = .short
         f.dateStyle = .none
         return f.string(from: date)
+    }
+
+    private func money(_ amount: Double, _ currency: String) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencyCode = currency
+        f.maximumFractionDigits = 2
+        // Pin to a consistent symbol-prefix format ("$18.77") rather than the
+        // host locale's convention (which can render "18,77 US$").
+        f.locale = Locale(identifier: "en_US")
+        return f.string(from: NSNumber(value: amount)) ?? String(format: "%.2f", amount)
     }
 }
 

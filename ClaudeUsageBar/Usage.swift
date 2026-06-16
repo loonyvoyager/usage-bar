@@ -21,6 +21,15 @@ struct ModelUsage: Identifiable, Equatable {
     let percent: Int
 }
 
+/// Pay-as-you-go "extra usage" credit pool (optional). Amounts are already in
+/// currency units (e.g. dollars), converted from the endpoint's minor units by
+/// ClaudeSession — the UI just formats them.
+struct CreditUsage: Equatable {
+    let used: Double
+    let limit: Double
+    let currency: String   // ISO code, e.g. "USD"
+}
+
 /// A single usage sample. Required fields describe the active *session* window;
 /// every "extended" field is optional so the UI can hide rows it has no data for
 /// (brief §3, invariant 5: graceful degradation).
@@ -34,6 +43,7 @@ struct Usage: Equatable {
     var weeklyPercent: Int?
     var weeklyReset: Date?
     var perModel: [ModelUsage]?
+    var credits: CreditUsage?
 
     /// When this sample was captured locally (for the "last updated" stamp).
     var capturedAt: Date
@@ -43,12 +53,14 @@ struct Usage: Equatable {
          weeklyPercent: Int? = nil,
          weeklyReset: Date? = nil,
          perModel: [ModelUsage]? = nil,
+         credits: CreditUsage? = nil,
          capturedAt: Date = Date()) {
         self.sessionPercent = sessionPercent
         self.sessionReset = sessionReset
         self.weeklyPercent = weeklyPercent
         self.weeklyReset = weeklyReset
         self.perModel = perModel
+        self.credits = credits
         self.capturedAt = capturedAt
     }
 }

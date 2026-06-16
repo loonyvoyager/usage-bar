@@ -279,6 +279,7 @@ final class ClaudeSession: NSObject {
             weeklyPercent: weekly?.percent,
             weeklyReset: weekly?.reset,
             perModel: models.isEmpty ? nil : models,
+            credits: parseCredits(root["extra_usage"]),
             capturedAt: Date()
         )
     }
@@ -295,6 +296,20 @@ final class ClaudeSession: NSObject {
     private func clampPercent(_ value: Any?) -> Int? {
         guard let d = asDouble(value), d.isFinite, d >= 0 else { return nil }
         return Int(min(100.0, d.rounded()))
+    }
+
+    /// Parse the optional pay-as-you-go credit pool (`extra_usage`). Returns nil
+    /// unless it's enabled with a positive limit. Amounts arrive in minor units
+    /// scaled by `decimal_places` (e.g. cents → dollars), so we convert here.
+    private func parseCredits(_ node: Any?) -> CreditUsage? {
+        guard let dict = node as? [String: Any],
+              (dict["is_enabled"] as? Bool) == true,
+              let limitRaw = asDouble(dict["monthly_limit"]), limitRaw > 0 else { return nil }
+        let dp = max(0, Int(asDouble(dict["decimal_places"]) ?? 0))
+        let divisor = pow(10.0, Double(dp))
+        let used = (asDouble(dict["used_credits"]) ?? 0) / divisor
+        let currency = (dict["currency"] as? String) ?? "USD"
+        return CreditUsage(used: used, limit: limitRaw / divisor, currency: currency)
     }
 
     // MARK: Defensive fallback (only if the documented shape changes)

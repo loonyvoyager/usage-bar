@@ -51,7 +51,7 @@ via DevTools/Chrome). The guessed candidate list has been replaced in
 | `five_hour` | **Session** window (5-hour rolling) | `sessionPercent`, `sessionReset` |
 | `seven_day` | **Weekly** window (Max plan) | `weeklyPercent`, `weeklyReset` |
 | `seven_day_opus`, `seven_day_sonnet` | per-model weekly (nullable) | `perModel` (only these two surfaced) |
-| `extra_usage` | pay-as-you-go credit pool | not surfaced yet (candidate for a later phase) |
+| `extra_usage` | pay-as-you-go credit pool | `credits` (Credits row: $ used + bar + monthly limit) |
 | `seven_day_cowork`, `tangelo`, `iguana_necktie`, `omelette*`, `cinder_cove` | internal/experimental buckets | intentionally ignored |
 
 ### Gotchas (handled in code)

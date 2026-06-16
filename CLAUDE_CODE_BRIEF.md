@@ -114,7 +114,8 @@ Each phase is a self-contained Claude Code session. Ship and verify before movin
 > history ring buffer, now drawn as a session-history **sparkline**
 > (`SparklineView` in `UsagePopoverView.swift`: auto-scaled with a minimum span,
 > area fill + latest-point dot, and a "collecting" hint until 2+ samples exist).
-> **Optional later:** surface `extra_usage` credits; further layout polish.
+> Also surfaces the `extra_usage` credit pool as a **Credits** row ($ used + bar
+> + monthly limit, hidden when not enabled). **Optional later:** layout polish.
 
 The popover becomes a richer panel. Target contents (show only what the endpoint
 actually provides — each row optional):
