@@ -164,6 +164,13 @@ screenshot mascot vibe). Requirements:
 - Sign-out (clear the data store), re-login flow.
 - **Done when:** settings persist (UserDefaults), launch-at-login works, sign-out
   fully clears session.
+- **Status (2026-06-16, partial):** `AppSettings` (ObservableObject + UserDefaults)
+  scaffold landed early with a **menu-bar display mode** setting — *Icon + %*
+  (gauge + "14%") vs *% / time left* ("14%/3h29m", no icon) — chosen via a picker
+  in the dropdown, persisted, live-updating (a 60s tick keeps the countdown
+  current between 5-min network refreshes). Popover also compacted ~25%
+  vertically. Still TODO: launch-at-login, refresh-interval/threshold settings,
+  sign-out.
 
 ### Phase 5 — Distribution (optional)  ☐
 - Code signing + notarization for sharing outside your Mac, or document the

@@ -92,5 +92,8 @@ degrades to a graceful error rather than a crash.
   conditionally, a last-updated stamp, and a session-history sparkline
   (auto-scaled, drawn from the in-memory ring buffer), and a Credits row for
   the `extra_usage` pay-as-you-go pool (hidden when not enabled).
+- **Phase 4 — Settings:** ◐ started early — a persisted menu-bar display mode
+  (*Icon + %* vs *% / time left*, e.g. `14%/3h29m`) selectable in the dropdown,
+  and the popover compacted ~25%. Launch-at-login / sign-out still to come.
 
 See the roadmap in `CLAUDE_CODE_BRIEF.md` §5 for later phases.
