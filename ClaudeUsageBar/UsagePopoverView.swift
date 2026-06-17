@@ -43,8 +43,12 @@ struct UsagePopoverView: View {
 
             Divider()
             menuBarModeRow
-            settingsDisclosure
             footer
+
+            if settingsExpanded {
+                Divider()
+                settingsPanel
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
@@ -228,30 +232,25 @@ struct UsagePopoverView: View {
         }
     }
 
-    // MARK: - Inline settings (option 3)
+    // MARK: - Inline settings panel (toggled by the footer gear; expands the popover under the layout)
 
-    private var settingsDisclosure: some View {
-        DisclosureGroup(isExpanded: $settingsExpanded) {
-            VStack(alignment: .leading, spacing: 8) {
-                Toggle("Launch at login", isOn: $settings.launchAtLogin)
-                HStack {
-                    Text("Refresh every").foregroundStyle(.secondary)
-                    Spacer()
-                    Picker("", selection: $settings.refreshIntervalMinutes) {
-                        ForEach(AppSettings.refreshChoices, id: \.self) { minutes in
-                            Text(minutes == 1 ? "1 min" : "\(minutes) min").tag(minutes)
-                        }
+    private var settingsPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Launch at login", isOn: $settings.launchAtLogin)
+            HStack {
+                Text("Refresh every").foregroundStyle(.secondary)
+                Spacer()
+                Picker("", selection: $settings.refreshIntervalMinutes) {
+                    ForEach(AppSettings.refreshChoices, id: \.self) { minutes in
+                        Text(minutes == 1 ? "1 min" : "\(minutes) min").tag(minutes)
                     }
-                    .labelsHidden().fixedSize()
                 }
-                Stepper("Warning at \(settings.warnThreshold)%",
-                        value: $settings.warnThreshold, in: 50...95, step: 5)
-                Button("Sign out", role: .destructive, action: onSignOut)
-                    .padding(.top, 2)
+                .labelsHidden().fixedSize()
             }
-            .padding(.top, 6)
-        } label: {
-            Text("More settings").font(.caption).foregroundStyle(.secondary)
+            Stepper("Warning at \(settings.warnThreshold)%",
+                    value: $settings.warnThreshold, in: 50...95, step: 5)
+            Button("Sign out", role: .destructive, action: onSignOut)
+                .padding(.top, 2)
         }
         .controlSize(.small)
     }
@@ -264,6 +263,13 @@ struct UsagePopoverView: View {
                 Label("Refresh", systemImage: "arrow.clockwise")
             }
             Spacer()
+            Button {
+                settingsExpanded.toggle()
+            } label: {
+                Label("Settings", systemImage: settingsExpanded ? "gearshape.fill" : "gearshape")
+            }
+            .labelStyle(.iconOnly)
+            .help("Settings")
             Button("Quit", action: onQuit)
                 .foregroundStyle(.secondary)
         }
