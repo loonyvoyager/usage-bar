@@ -48,10 +48,10 @@ This is the fast "does it still compile" check used during development.
 | File | Role |
 |------|------|
 | `ClaudeUsageBarApp.swift` | `@main` entry; menu-bar-only scene (`Settings{}`). |
-| `AppDelegate.swift` | `NSStatusItem`, `NSPopover`, login window, refresh timer. The only place that wires network → store → UI. |
+| `AppDelegate.swift` | `NSStatusItem`, a borderless dropdown panel (`KeyPanel`), login window, refresh timer. The only place that wires network → store → UI. |
 | `ClaudeSession.swift` | **Quarantined** cookie session + usage fetch + parsing. The *only* file that knows URLs / JSON keys / cookies. |
 | `LoginView.swift` | Embedded `WKWebView` login; persists cookies in the shared data store. |
-| `UsagePopoverView.swift` | SwiftUI popover UI. Reads state, calls closures, never touches the network. |
+| `UsagePopoverView.swift` | SwiftUI dropdown UI. Reads state, calls closures, never touches the network. |
 | `Usage.swift` | `Usage` model + observable `UsageStore` / `UsageState`. |
 
 **Data flow is one way:** `ClaudeSession` → `UsageStore.state` (enum) → UI.

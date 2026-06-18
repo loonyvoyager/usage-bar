@@ -2,17 +2,28 @@
 //  AppDelegate.swift
 //  ClaudeUsageBar
 //
-//  The orchestrator. Owns the NSStatusItem, the NSPopover, the login window,
-//  and the refresh timer. It is the ONLY place that wires the network
+//  The orchestrator. Owns the NSStatusItem, the dropdown panel, the login
+//  window, and the refresh timer. It is the ONLY place that wires the network
 //  (ClaudeSession) to the observable store (UsageStore) and down to the UI via
 //  closures. UI never calls the network directly (brief §3, invariant 2).
+//
+//  The dropdown is a borderless panel (not an NSPopover) so it has no arrow and
+//  is pinned under the status item's right edge. That decouples it from the
+//  status item's width, which is therefore free to be minimal (variable length)
+//  without the dropdown shifting when the display mode or value changes.
+//
+//  Sizing note: the panel is sized MANUALLY (to the hosting view's fittingSize)
+//  on discrete state/settings changes — NOT via NSHostingController's
+//  preferredContentSize auto-sizing, which feeds back into a window resize loop
+//  (synchronous recursion → stack overflow).
 //
 
 import AppKit
 import SwiftUI
+import Combine
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let store = UsageStore()
     private let session = ClaudeSession()
@@ -20,10 +31,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let settings = AppSettings()
 
     private var statusItem: NSStatusItem!
-    private var popover: NSPopover!
+    private var panel: KeyPanel!
+    private var contentView: NSView!            // the NSHostingView; read its fittingSize
     private var loginWindow: NSWindow?
     private var refreshTimer: Timer?
     private var displayTimer: Timer?
+    private var clickMonitors: [Any] = []
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Lifecycle
 
@@ -32,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         setupStatusItem()
-        setupPopover()
+        setupPanel()
         settings.onChange = { [weak self] in self?.applySettings() }
         startRefreshTimer()
         startDisplayTimer()
@@ -50,35 +64,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
-    // MARK: - Status item & popover
+    // MARK: - Status item
 
     private func setupStatusItem() {
+        // Variable length: the item hugs its content (minimal menu-bar footprint).
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "gauge.medium",
                                    accessibilityDescription: "Claude usage")
             button.imagePosition = .imageLeading
             button.target = self
-            button.action = #selector(togglePopover)
+            button.action = #selector(togglePanel)
         }
-        pinStatusItemWidth()
     }
 
-    /// Pin the status item to a fixed width (sized to the widest content) so that
-    /// changing the display mode or values never resizes it — a resize would shift
-    /// the anchored popover. Content sits centered within the fixed slot.
-    private func pinStatusItemWidth() {
-        let font = statusItem.button?.font ?? NSFont.menuBarFont(ofSize: 0)
-        // Widest text we render: "% / time left" with a 3-digit % and the longest
-        // session time-left (the session window is < 5h, so "4h59m").
-        let widest = "100%/4h59m" as NSString
-        let width = widest.size(withAttributes: [.font: font]).width
-        statusItem.length = ceil(width) + 12
-    }
+    // MARK: - Dropdown panel
 
-    private func setupPopover() {
-        popover = NSPopover()
-        popover.behavior = .transient
+    private func setupPanel() {
         let root = UsagePopoverView(
             store: store,
             settings: settings,
@@ -87,26 +89,101 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             onSignOut: { [weak self] in self?.signOut() },
             onQuit:    { [weak self] in self?.quit() }
         )
-        let hosting = NSHostingController(rootView: root)
-        hosting.sizingOptions = [.preferredContentSize]   // popover tracks SwiftUI content height
-        popover.contentViewController = hosting
-        popover.delegate = self
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+        let hostingView = NSHostingView(rootView: root)
+        contentView = hostingView
+
+        let panel = KeyPanel(contentRect: NSRect(x: 0, y: 0, width: 300, height: 200),
+                             styleMask: [.borderless, .nonactivatingPanel],
+                             backing: .buffered, defer: false)
+        panel.contentView = hostingView
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.level = .popUpMenu
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.isReleasedWhenClosed = false
+        panel.hidesOnDeactivate = false
+        self.panel = panel
+
+        // Re-fit the panel when the content's height can change (state transitions,
+        // settings panel expand/collapse). Deferred to the next main-actor tick so
+        // SwiftUI has applied the change before we measure fittingSize.
+        store.$state
+            .sink { [weak self] _ in Task { @MainActor in self?.resizePanelIfVisible() } }
+            .store(in: &cancellables)
+        settings.$settingsExpanded
+            .sink { [weak self] _ in Task { @MainActor in self?.resizePanelIfVisible() } }
+            .store(in: &cancellables)
     }
 
-    /// Collapse the inline settings panel whenever the popover closes (any way:
-    /// toggle, click-outside, sign-out) so it always reopens collapsed.
-    func popoverDidClose(_ notification: Notification) {
-        settings.settingsExpanded = false
-    }
-
-    @objc private func togglePopover() {
-        guard let button = statusItem.button else { return }
-        if popover.isShown {
-            popover.performClose(nil)
+    @objc private func togglePanel() {
+        if panel.isVisible {
+            hidePanel()
         } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
+            showPanel()
         }
+    }
+
+    private func showPanel() {
+        positionPanel()
+        panel.makeKeyAndOrderFront(nil)
+        installClickMonitors()
+    }
+
+    private func hidePanel() {
+        removeClickMonitors()
+        settings.settingsExpanded = false   // always reopen collapsed
+        panel.orderOut(nil)
+    }
+
+    private func resizePanelIfVisible() {
+        guard panel.isVisible else { return }
+        positionPanel()
+    }
+
+    /// Size the panel to its content and pin its top-right corner just below the
+    /// status item's right edge. Clamped to the screen's visible frame.
+    private func positionPanel() {
+        guard let button = statusItem.button, let buttonWindow = button.window else { return }
+        let fitting = contentView.fittingSize
+        let size = (fitting.width > 1 && fitting.height > 1) ? fitting : panel.frame.size
+        guard size.width > 1, size.height > 1 else { return }
+
+        let onScreen = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let gap: CGFloat = 6
+        var x = onScreen.maxX - size.width                 // right-align to the item's right edge
+        let y = onScreen.minY - gap - size.height          // hang just below the menu bar
+
+        if let visible = (buttonWindow.screen ?? NSScreen.main)?.visibleFrame {
+            x = min(max(x, visible.minX + 8), visible.maxX - size.width - 8)
+        }
+        panel.setFrame(NSRect(x: x, y: y, width: size.width, height: size.height), display: true)
+    }
+
+    // MARK: - Click-outside dismissal
+
+    private func installClickMonitors() {
+        removeClickMonitors()
+        let global = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            self?.hidePanel()
+        }
+        let local = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self else { return event }
+            // Status-item clicks are handled by the button action (toggle); clicks
+            // inside the panel pass through; anything else dismisses.
+            if event.window == self.statusItem.button?.window { return event }
+            if event.window != self.panel { self.hidePanel() }
+            return event
+        }
+        clickMonitors = [global, local].compactMap { $0 }
+    }
+
+    private func removeClickMonitors() {
+        clickMonitors.forEach { NSEvent.removeMonitor($0) }
+        clickMonitors.removeAll()
     }
 
     // MARK: - Refresh
@@ -176,7 +253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     // MARK: - Login
 
     private func showLogin() {
-        if popover.isShown { popover.performClose(nil) }
+        if panel.isVisible { hidePanel() }
 
         if let existing = loginWindow {
             NSApp.activate(ignoringOtherApps: true)
@@ -211,7 +288,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     // MARK: - Sign out
 
     private func signOut() {
-        if popover.isShown { popover.performClose(nil) }
+        if panel.isVisible { hidePanel() }
         Task {
             await session.clearSession()
             store.setState(.needsLogin)
@@ -291,4 +368,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         default:      return "gauge.high"
         }
     }
+}
+
+/// A borderless panel that can still become key — so it receives clicks and we
+/// can dismiss on outside clicks. Borderless windows can't become key by default.
+final class KeyPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
 }
