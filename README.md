@@ -11,7 +11,7 @@ Settings → Usage.
 ## Install
 
 Grab the latest **`ClaudeUsageBar.dmg`** from the
-[Releases](https://github.com/loonyvoyager/minimal-usage/releases) page, open it,
+[Releases](https://github.com/loonyvoyager/claude-usage/releases) page, open it,
 and drag the app to Applications. It's signed and notarized by Apple, so it opens
 with no Gatekeeper warning.
 
