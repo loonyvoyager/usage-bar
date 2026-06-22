@@ -16,7 +16,7 @@
 //      origin, and credentials the real web app uses — no header guessing,
 //      no httpOnly-cookie copying, no CORS.
 //
-//  ENDPOINT (verified 2026-06-16 via DevTools/Chrome — see ENDPOINT_NOTES.md):
+//  ENDPOINT (verified 2026-06-16 via DevTools/Chrome):
 //    GET /api/organizations/{org}/usage  →
 //      {
 //        "five_hour":  { "utilization": <0-100>, "resets_at": <ISO-8601 | null> },  // session window

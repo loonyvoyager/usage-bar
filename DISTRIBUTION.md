@@ -1,7 +1,7 @@
 # Distribution — signed & notarized .dmg
 
 How to build a `ClaudeUsageBar.dmg` that anyone can download from a website and
-open with no Gatekeeper warning. This is Phase 5 of the brief.
+open with no Gatekeeper warning.
 
 The build is automated by [`scripts/package.sh`](scripts/package.sh); the steps
 below are the **one-time setup** plus how to run it.

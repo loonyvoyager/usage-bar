@@ -9,5 +9,7 @@ DerivedData/
 # macOS
 .DS_Store
 
-# Endpoint notes may contain a real org UUID — uncomment if you paste one in.
-# ENDPOINT_NOTES.md
+# Internal planning / notes — kept local, not published
+CLAUDE_CODE_BRIEF.md
+ENDPOINT_NOTES.md
+PROJECT_SCOPE.md

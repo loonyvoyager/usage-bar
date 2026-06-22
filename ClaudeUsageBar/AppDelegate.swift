@@ -242,7 +242,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch error {
         case SessionError.noData:
             return "Signed in, but couldn't read a usage value from claude.ai. "
-                 + "The internal endpoint may have changed — see Phase 1 in the brief."
+                 + "Its internal usage endpoint may have changed."
         case SessionError.network(let detail):
             return detail
         default:

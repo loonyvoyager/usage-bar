@@ -4,7 +4,7 @@
 //
 //  The model layer. Plain, typed Swift values + an observable store.
 //  This file knows NOTHING about URLs, JSON keys, or cookies — that all
-//  lives in ClaudeSession.swift (see CLAUDE_CODE_BRIEF.md §3, invariant 1).
+//  lives in ClaudeSession.swift — the only file that knows the endpoint.
 //
 //  State flows one way:  ClaudeSession → UsageStore.state (enum) → UI.
 //
