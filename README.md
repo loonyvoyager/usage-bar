@@ -51,6 +51,16 @@ Each row appears only if claude.ai returns that data, so the panel stays tidy.
 3. It's menu-bar-only (**no Dock icon, no window**). Click the gauge near your
    clock and **sign in to claude.ai once**; after that it stays signed in.
 
+**Prefer the terminal?** Install or remove it from the command line:
+
+```sh
+# install — downloads the latest signed release into /Applications
+curl -fsSL https://raw.githubusercontent.com/loonyvoyager/claude-usage/main/scripts/install.sh | bash
+
+# uninstall — removes the app plus its saved session and settings
+curl -fsSL https://raw.githubusercontent.com/loonyvoyager/claude-usage/main/scripts/uninstall.sh | bash
+```
+
 Settings — launch at login, refresh interval, warning threshold, menu-bar style,
 and sign out — live behind the ⚙︎ gear in the dropdown.
 
