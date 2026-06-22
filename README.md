@@ -12,12 +12,12 @@ clock: no Dock icon, no window.
 > Glance up and see how much of your session you've burned and when it resets —
 > without breaking flow to go check the website.
 
-<p align="center">
+<p align="left">
   <img src="assets/screenshot.png" width="720"
        alt="UsageBar menu-bar dropdown showing session, weekly, per-model, and credit usage">
 </p>
 
-<p align="center">
+<p align="left">
   <a href="https://github.com/loonyvoyager/usage-bar/releases/latest/download/UsageBar.dmg"><b>⬇&nbsp; Download UsageBar.dmg</b></a><br>
   <sub>Signed &amp; notarized — opens with no Gatekeeper warning.</sub>
 </p>
