@@ -1,0 +1,22 @@
+# Build check: the app compiles cleanly on a stock macOS runner (no signing).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: Build (unsigned)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          xcodebuild -project UsageBar.xcodeproj \
+                     -scheme UsageBar \
+                     -configuration Debug \
+                     -destination 'platform=macOS' \
+                     CODE_SIGNING_ALLOWED=NO \
+                     build

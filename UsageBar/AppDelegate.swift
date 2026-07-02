@@ -39,6 +39,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var clickMonitors: [Any] = []
     private var cancellables = Set<AnyCancellable>()
 
+    /// Refresh coalescing: UsageSession's web-view load must not run re-entrantly
+    /// (its single load continuation would be clobbered), so overlapping refresh
+    /// requests (timer + manual + post-login) queue at most one follow-up.
+    private var isRefreshing = false
+    private var refreshQueued = false
+
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -193,16 +199,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startRefreshTimer() {
         refreshTimer?.invalidate()
         let interval = TimeInterval(max(1, settings.refreshIntervalMinutes) * 60)
-        refreshTimer = Timer.scheduledTimer(timeInterval: interval,
-                                            target: self,
-                                            selector: #selector(timerFired),
-                                            userInfo: nil,
-                                            repeats: true)
+        let timer = Timer(timeInterval: interval,
+                          target: self,
+                          selector: #selector(timerFired),
+                          userInfo: nil,
+                          repeats: true)
+        timer.tolerance = interval * 0.1        // let the system coalesce wakeups
+        RunLoop.main.add(timer, forMode: .common)  // keep firing during event tracking
+        refreshTimer = timer
     }
 
     /// React to a settings change: pick up a new interval and re-render the bar.
+    /// The timer is only restarted when the cadence actually changed, so unrelated
+    /// tweaks (display mode, threshold) don't postpone the next scheduled fetch.
     private func applySettings() {
-        startRefreshTimer()
+        let interval = TimeInterval(max(1, settings.refreshIntervalMinutes) * 60)
+        if refreshTimer?.timeInterval != interval {
+            startRefreshTimer()
+        }
         updateButton()
     }
 
@@ -212,20 +226,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startDisplayTimer() {
         displayTimer?.invalidate()
-        displayTimer = Timer.scheduledTimer(timeInterval: 60,
-                                            target: self,
-                                            selector: #selector(displayTick),
-                                            userInfo: nil,
-                                            repeats: true)
+        let timer = Timer(timeInterval: 60,
+                          target: self,
+                          selector: #selector(displayTick),
+                          userInfo: nil,
+                          repeats: true)
+        timer.tolerance = 5
+        RunLoop.main.add(timer, forMode: .common)
+        displayTimer = timer
     }
 
     private func refresh() {
+        // Coalesce overlapping refreshes; see isRefreshing/refreshQueued above.
+        guard !isRefreshing else {
+            refreshQueued = true
+            return
+        }
+        isRefreshing = true
+
         // Don't flash a spinner over good data on periodic refreshes.
         if store.latest == nil {
             store.setState(.loading)
             updateButton()
         }
         Task {
+            defer {
+                isRefreshing = false
+                if refreshQueued {
+                    refreshQueued = false
+                    refresh()
+                }
+            }
             do {
                 let usage = try await session.fetchUsage()
                 store.setState(.loaded(usage))

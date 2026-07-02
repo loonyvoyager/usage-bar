@@ -58,6 +58,28 @@ xcrun stapler validate build/export/UsageBar.app
 spctl -a -vvv -t install build/export/UsageBar.app   # expect: accepted, source=Notarized Developer ID
 ```
 
+## Troubleshooting
+
+- **`notarytool` returns `Rejected`, status code 7000 — "Team is not yet
+  configured for notarization"** (and the log shows `"issues": null`): nothing is
+  wrong with your build. The Apple Developer *account* doesn't have the notary
+  service enabled yet — seen on newly-activated memberships. Check for a pending
+  Program License Agreement at <https://developer.apple.com/account>; if there's
+  none to accept, contact Developer Programs Support (topic *Development and
+  Technical*) and ask them to enable notarization for your team. Until then you
+  can ship the signed-but-unnotarized app — users get a one-time "Open Anyway"
+  prompt (v0.1.0 shipped this way; `scripts/install.sh` clears the quarantine
+  flag so the terminal install skips the prompt entirely).
+- **`codesign --verify --strict` or notarization fails with "resource fork,
+  Finder information, or similar detritus not allowed"**: macOS stamped extended
+  attributes (e.g. `com.apple.FinderInfo`) onto the bundle — common when the repo
+  lives in an iCloud-synced folder (Desktop/Documents). `package.sh` strips them
+  with `xattr -cr` before submitting; if you build by hand, do the same.
+- **Submission stuck "In Progress" for hours**: the queue normally clears in
+  minutes; multi-hour waits tend to end in the 7000 rejection above. Check
+  <https://developer.apple.com/system-status/> and
+  `xcrun notarytool log <submission-id>`.
+
 ## Notes
 
 - **Hardened Runtime** is required for notarization and is enabled in the project.

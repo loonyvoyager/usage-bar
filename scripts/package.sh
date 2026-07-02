@@ -73,6 +73,10 @@ xcodebuild -exportArchive \
 echo "==> Stripping xattr detritus"
 xattr -cr "$APP"
 
+# Fail fast on any signature problem BEFORE spending a notary round-trip.
+echo "==> Verifying the signature (strict)"
+codesign --verify --deep --strict "$APP"
+
 echo "==> Notarizing the app"
 ditto -c -k --keepParent "$APP" "$BUILD/$APP_NAME.zip"
 xcrun notarytool submit "$BUILD/$APP_NAME.zip" \

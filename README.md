@@ -2,6 +2,7 @@
 
 [![macOS 13+](https://img.shields.io/badge/macOS-13%2B-111111?logo=apple&logoColor=white)](#requirements)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/loonyvoyager/usage-bar/actions/workflows/ci.yml/badge.svg)](https://github.com/loonyvoyager/usage-bar/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/loonyvoyager/usage-bar?label=release)](https://github.com/loonyvoyager/usage-bar/releases/latest)
 
 A tiny native **macOS menu-bar app** that shows your current **claude.ai usage** at a
