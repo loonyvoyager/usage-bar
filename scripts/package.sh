@@ -66,6 +66,13 @@ xcodebuild -exportArchive \
 
 [ -d "$APP" ] || { echo "error: export did not produce $APP"; exit 1; }
 
+# Strip extended-attribute detritus (com.apple.FinderInfo, etc.) that iCloud /
+# Finder may stamp onto the bundle. codesign --strict and Apple notarization both
+# reject "resource fork, Finder information, or similar detritus" — common when the
+# repo lives on an iCloud-synced Desktop/Documents folder.
+echo "==> Stripping xattr detritus"
+xattr -cr "$APP"
+
 echo "==> Notarizing the app"
 ditto -c -k --keepParent "$APP" "$BUILD/$APP_NAME.zip"
 xcrun notarytool submit "$BUILD/$APP_NAME.zip" \
@@ -79,6 +86,7 @@ xcrun stapler validate "$APP"
 echo "==> Building the .dmg (drag-to-Applications)"
 rm -rf "$STAGING"; mkdir -p "$STAGING"
 cp -R "$APP" "$STAGING/"
+xattr -cr "$STAGING/$APP_NAME.app"   # re-strip in case iCloud re-stamped during notarization
 ln -s /Applications "$STAGING/Applications"
 hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
 
