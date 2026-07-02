@@ -3,7 +3,7 @@
 Notable changes to UsageBar. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions track app releases.
 
-## [0.1.0] — unreleased (first public release)
+## [0.1.0] — 2026-07-02 (first public release)
 
 ### Added
 - Menu-bar app showing claude.ai **session** and **weekly** usage (% + reset
@@ -17,7 +17,9 @@ Notable changes to UsageBar. Format loosely follows
 - Embedded claude.ai **web-view login**; credentials never leave the device, no
   telemetry.
 - Beak-less, right-aligned dropdown panel with a minimal-width status item.
-- Signed & **notarized** `.dmg` build pipeline (`scripts/package.sh`).
+- Developer-ID **signed** `.dmg` build pipeline (`scripts/package.sh`).
+  Notarization is wired up but pending Apple enabling it for the account, so this
+  first build opens after a one-time confirmation (see the README's Install note).
 
 ### Notes
 - Reads claude.ai's **internal** usage endpoint (no public API); isolated to

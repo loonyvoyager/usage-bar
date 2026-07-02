@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# install.sh — download the latest signed & notarized UsageBar and install
-# it to /Applications. For people who'd rather not click around a .dmg.
+# install.sh — download the latest signed UsageBar release and install it to
+# /Applications. For people who'd rather not click around a .dmg. This also
+# clears the quarantine flag, so the app opens without a Gatekeeper prompt.
 #
 #   curl -fsSL https://raw.githubusercontent.com/loonyvoyager/usage-bar/main/scripts/install.sh | bash
 #
@@ -33,6 +34,9 @@ if ! cp -R "$mnt/$APP_NAME.app" "$DEST/" 2>/dev/null; then
   echo "  PREFIX=\"\$HOME/Applications\" bash install.sh"
   exit 1
 fi
+
+echo "==> Clearing the quarantine flag (so it opens without a Gatekeeper prompt)…"
+xattr -dr com.apple.quarantine "$DEST/$APP_NAME.app" 2>/dev/null || true
 
 echo "==> Launching…"
 open "$DEST/$APP_NAME.app"

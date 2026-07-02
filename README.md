@@ -19,7 +19,7 @@ clock: no Dock icon, no window.
 
 <p align="left">
   <a href="https://github.com/loonyvoyager/usage-bar/releases/latest/download/UsageBar.dmg"><b>⬇&nbsp; Download UsageBar.dmg</b></a><br>
-  <sub>Signed &amp; notarized — opens with no Gatekeeper warning.</sub>
+  <sub>Developer-ID signed. First open needs a one-time confirmation — see <a href="#install">Install</a>.</sub>
 </p>
 
 > **Unofficial — not affiliated with, or endorsed by, Anthropic.**
@@ -46,10 +46,19 @@ Each row appears only if claude.ai returns that data, so the panel stays tidy.
 1. Download **`UsageBar.dmg`** from
    [Releases](https://github.com/loonyvoyager/usage-bar/releases/latest), open
    it, and drag the app into **Applications**.
-2. It's **signed and notarized**, so it just opens — no right-click, no Gatekeeper
-   warning.
+2. **First launch (one time):** the app is Developer-ID signed but not yet
+   notarized,\* so macOS asks you to confirm. Either **System Settings → Privacy &
+   Security → Open Anyway**, or run this once in Terminal:
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/UsageBar.app
+   ```
+   After that it opens normally, like any other app.
 3. It's menu-bar-only (**no Dock icon, no window**). Click the gauge near your
    clock and **sign in to claude.ai once**; after that it stays signed in.
+
+<sub>\*Notarization is pending Apple enabling it for the developer account; a
+notarized build (no confirmation step) will follow as a point release. The
+Terminal installer below strips the flag for you, so it skips the prompt.</sub>
 
 **Prefer the terminal?** Install or remove it from the command line:
 
