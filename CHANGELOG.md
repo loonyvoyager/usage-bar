@@ -14,6 +14,11 @@ Notable changes to UsageBar. Format loosely follows
   label, so the status item never resizes as the numbers change.
 - GitHub Actions CI: an unsigned build on every push / pull request.
 
+### Removed
+- The `Icon only` and `Icon + %` menu-bar styles — the picker is now just
+  `Meters` and `% / time left`. A stored preference naming a removed style no
+  longer parses, so those installs migrate to `Meters` on next launch.
+
 ### Fixed
 - Overlapping refreshes (timer + manual + post-login) could race on the shared
   web view and leak a task; refreshes are now coalesced.

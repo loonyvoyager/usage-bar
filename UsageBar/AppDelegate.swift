@@ -360,16 +360,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func renderLoaded(_ button: NSStatusBarButton, _ usage: Usage) {
         button.contentTintColor = usage.sessionPercent >= settings.warnThreshold ? .systemOrange : nil
         switch settings.menuBarMode {
-        case .iconOnly:
-            button.image = NSImage(systemSymbolName: symbolName(for: usage.sessionPercent),
-                                   accessibilityDescription: "claude.ai usage \(usage.sessionPercent)%")
+        case .meters:
+            button.image = meterImage(for: usage)
             button.imagePosition = .imageOnly
             button.title = ""
-        case .iconPercent:
-            button.image = NSImage(systemSymbolName: symbolName(for: usage.sessionPercent),
-                                   accessibilityDescription: "claude.ai usage \(usage.sessionPercent)%")
-            button.imagePosition = .imageLeading
-            button.title = " \(usage.sessionPercent)%"
         case .percentTime:
             button.image = nil
             button.imagePosition = .noImage
@@ -378,10 +372,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } else {
                 button.title = "\(usage.sessionPercent)%"
             }
-        case .meters:
-            button.image = meterImage(for: usage)
-            button.imagePosition = .imageOnly
-            button.title = ""
         }
     }
 
@@ -394,14 +384,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if hours >= 24 { return "\(hours / 24)d\(hours % 24)h" }
         if hours > 0 { return "\(hours)h\(minutes)m" }
         return "\(minutes)m"
-    }
-
-    private func symbolName(for percent: Int) -> String {
-        switch percent {
-        case ..<34:  return "gauge.low"
-        case 34..<67: return "gauge.medium"
-        default:      return "gauge.high"
-        }
     }
 
     // MARK: - Meter rendering

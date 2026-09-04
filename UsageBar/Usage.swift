@@ -104,23 +104,17 @@ final class UsageStore: ObservableObject {
 
 /// How the menu-bar status item renders the current session usage.
 enum MenuBarMode: String, CaseIterable, Identifiable {
-    /// Gauge icon only, no text.
-    case iconOnly
-    /// Gauge icon + "14%".
-    case iconPercent
-    /// "14%/3h29m" text, no icon.
-    case percentTime
     /// Compact meters: each window's % stacked over a small segmented bar —
     /// session, plus weekly when the endpoint provides it.
     case meters
+    /// "14%/3h29m" text, no icon.
+    case percentTime
 
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .iconOnly: return "Icon only"
-        case .iconPercent: return "Icon + %"
-        case .percentTime: return "% / time left"
         case .meters: return "Meters"
+        case .percentTime: return "% / time left"
         }
     }
 }
@@ -180,6 +174,8 @@ final class AppSettings: ObservableObject {
     init() {
         let defaults = UserDefaults.standard
 
+        // A retired mode's raw value (the old icon styles) no longer parses, so
+        // anyone still stored on one quietly migrates to the default.
         let rawMode = defaults.string(forKey: Keys.menuBarMode)
         menuBarMode = rawMode.flatMap(MenuBarMode.init(rawValue:)) ?? .meters
 
