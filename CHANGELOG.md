@@ -3,11 +3,12 @@
 Notable changes to UsageBar. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions track app releases.
 
-## [Unreleased]
+## [0.1.1] — unreleased
 
 ### Added
-- **Meters** menu-bar style — the session window (and the weekly one, when
-  claude.ai exposes it) drawn as a percentage above a small segmented bar.
+- **Meters** menu-bar style, now the **default** for new installs — the session
+  window (and the weekly one, when claude.ai exposes it) drawn as a percentage
+  above a small segmented bar.
   Rendered as a template image, so it inverts correctly on light/dark menu bars
   and still picks up the warning tint. Its width is fixed to the widest possible
   label, so the status item never resizes as the numbers change.

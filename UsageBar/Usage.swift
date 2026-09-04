@@ -181,7 +181,7 @@ final class AppSettings: ObservableObject {
         let defaults = UserDefaults.standard
 
         let rawMode = defaults.string(forKey: Keys.menuBarMode)
-        menuBarMode = rawMode.flatMap(MenuBarMode.init(rawValue:)) ?? .iconPercent
+        menuBarMode = rawMode.flatMap(MenuBarMode.init(rawValue:)) ?? .meters
 
         let storedInterval = defaults.integer(forKey: Keys.refreshIntervalMinutes)   // 0 when unset
         refreshIntervalMinutes = Self.refreshChoices.contains(storedInterval) ? storedInterval : 5
