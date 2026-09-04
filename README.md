@@ -32,8 +32,9 @@ clock: no Dock icon, no window.
 - **Weekly window** — % used + reset (for plans with a weekly cap).
 - **By model** — per-model usage (e.g. Opus / Sonnet) when claude.ai exposes it.
 - **Credits** — pay-as-you-go "extra usage" spend vs. your monthly cap.
-- **Menu-bar label** — choose `% / time left` (e.g. `6%/4h3m`), `Icon + %`, or
-  `Icon only`; it tints orange past a warning threshold you set.
+- **Menu-bar label** — choose `Meters` (session and weekly as a % over a compact
+  segmented bar), `% / time left` (e.g. `6%/4h3m`), `Icon + %`, or `Icon only`;
+  it tints orange past a warning threshold you set.
 
 Each row appears only if claude.ai returns that data, so the panel stays tidy.
 

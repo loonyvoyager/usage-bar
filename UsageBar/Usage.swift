@@ -110,6 +110,9 @@ enum MenuBarMode: String, CaseIterable, Identifiable {
     case iconPercent
     /// "14%/3h29m" text, no icon.
     case percentTime
+    /// Compact meters: each window's % stacked over a small segmented bar —
+    /// session, plus weekly when the endpoint provides it.
+    case meters
 
     var id: String { rawValue }
     var label: String {
@@ -117,6 +120,7 @@ enum MenuBarMode: String, CaseIterable, Identifiable {
         case .iconOnly: return "Icon only"
         case .iconPercent: return "Icon + %"
         case .percentTime: return "% / time left"
+        case .meters: return "Meters"
         }
     }
 }

@@ -378,6 +378,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } else {
                 button.title = "\(usage.sessionPercent)%"
             }
+        case .meters:
+            button.image = meterImage(for: usage)
+            button.imagePosition = .imageOnly
+            button.title = ""
         }
     }
 
@@ -398,6 +402,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case 34..<67: return "gauge.medium"
         default:      return "gauge.high"
         }
+    }
+
+    // MARK: - Meter rendering
+
+    /// Segments per meter bar. A FIXED count (and a column sized to the widest
+    /// possible label, "100%") keeps the status item's width constant as values
+    /// change — a menu-bar item that resizes as numbers tick is distracting.
+    private static let meterSegments = 7
+
+    /// Draw the compact indicator: each window's percentage sitting above a small
+    /// segmented bar — session first, weekly appended when the endpoint has it.
+    ///
+    /// Drawn as a *template* image, so AppKit inverts it for light/dark menu bars
+    /// automatically and the over-threshold `contentTintColor` still applies.
+    private func meterImage(for usage: Usage) -> NSImage {
+        var percents = [usage.sessionPercent]
+        if let weekly = usage.weeklyPercent { percents.append(weekly) }
+
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .semibold),
+            // Template rendering keys off alpha, not hue; black = fully opaque.
+            .foregroundColor: NSColor.black
+        ]
+        let labels = percents.map { NSAttributedString(string: "\($0)%", attributes: attrs) }
+        let lit = percents.map { Self.litSegments($0, of: Self.meterSegments) }
+
+        let segments = Self.meterSegments
+        let dot = CGSize(width: 2, height: 2)
+        let dotGap: CGFloat = 1
+        let columnGap: CGFloat = 7
+        let textGap: CGFloat = 2
+        let meterWidth = CGFloat(segments) * dot.width + CGFloat(segments - 1) * dotGap
+        // Size every column to "100%" so the width never changes with the value.
+        let widest = NSAttributedString(string: "100%", attributes: attrs).size().width
+        let columnWidth = max(widest, meterWidth).rounded(.up)
+        let textHeight = (labels.map { $0.size().height }.max() ?? 11).rounded(.up)
+
+        let count = CGFloat(labels.count)
+        let size = NSSize(width: columnWidth * count + columnGap * max(0, count - 1),
+                          height: textHeight + textGap + dot.height)
+
+        let image = NSImage(size: size, flipped: false) { _ in
+            for (index, label) in labels.enumerated() {
+                let originX = CGFloat(index) * (columnWidth + columnGap)
+
+                let labelSize = label.size()
+                label.draw(at: NSPoint(x: originX + (columnWidth - labelSize.width) / 2,
+                                       y: dot.height + textGap))
+
+                var dotX = originX + (columnWidth - meterWidth) / 2
+                for segment in 0..<segments {
+                    NSColor.black.withAlphaComponent(segment < lit[index] ? 1.0 : 0.25).setFill()
+                    NSBezierPath(roundedRect: NSRect(x: dotX, y: 0,
+                                                     width: dot.width, height: dot.height),
+                                 xRadius: dot.width / 2,
+                                 yRadius: dot.height / 2).fill()
+                    dotX += dot.width + dotGap
+                }
+            }
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = Self.meterAccessibilityText(for: usage)
+        return image
+    }
+
+    /// Segments lit for `percent`. Any non-zero usage lights at least one, so
+    /// "barely used" never reads as "nothing here".
+    private static func litSegments(_ percent: Int, of total: Int) -> Int {
+        guard percent > 0 else { return 0 }
+        return min(total, max(1, Int((Double(percent) / 100 * Double(total)).rounded())))
+    }
+
+    private static func meterAccessibilityText(for usage: Usage) -> String {
+        var parts = ["session \(usage.sessionPercent)%"]
+        if let weekly = usage.weeklyPercent { parts.append("weekly \(weekly)%") }
+        return "claude.ai usage — " + parts.joined(separator: ", ")
     }
 }
 
