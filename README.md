@@ -35,6 +35,9 @@ clock: no Dock icon, no window.
 - **Menu-bar label** — choose `Meters` (session and weekly as a % over a compact
   segmented bar) or `% / time left` (e.g. `6%/4h3m`); it tints orange past a
   warning threshold you set.
+- **Dock icon** (optional) — flip on *Show in Dock* and the app's Dock icon becomes
+  a live ring of your session %, with the number in the middle. Click it to open
+  the dropdown.
 
 Each row appears only if claude.ai returns that data, so the panel stays tidy.
 
@@ -72,8 +75,8 @@ curl -fsSL https://raw.githubusercontent.com/loonyvoyager/usage-bar/main/scripts
 curl -fsSL https://raw.githubusercontent.com/loonyvoyager/usage-bar/main/scripts/uninstall.sh | bash
 ```
 
-Settings — launch at login, refresh interval, warning threshold, menu-bar style,
-and sign out — live behind the ⚙︎ gear in the dropdown.
+Settings — launch at login, show in Dock, refresh interval, warning threshold,
+menu-bar style, and sign out — live behind the ⚙︎ gear in the dropdown.
 
 ## Privacy
 

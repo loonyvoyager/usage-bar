@@ -153,6 +153,14 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Also show the app in the Dock, with a live usage ring as its icon.
+    @Published var showInDock: Bool {
+        didSet {
+            UserDefaults.standard.set(showInDock, forKey: Keys.showInDock)
+            onChange?()
+        }
+    }
+
     /// Transient UI state (NOT persisted): whether the popover's settings panel is
     /// expanded. AppDelegate resets it to false when the popover closes, so it
     /// always starts collapsed on the next open.
@@ -169,6 +177,7 @@ final class AppSettings: ObservableObject {
         static let menuBarMode = "menuBarMode"
         static let refreshIntervalMinutes = "refreshIntervalMinutes"
         static let warnThreshold = "warnThreshold"
+        static let showInDock = "showInDock"
     }
 
     init() {
@@ -187,6 +196,8 @@ final class AppSettings: ObservableObject {
 
         // Launch-at-login's source of truth is SMAppService, not UserDefaults.
         launchAtLogin = LaunchAtLogin.isEnabled
+
+        showInDock = defaults.bool(forKey: Keys.showInDock)   // false when unset
     }
 }
 

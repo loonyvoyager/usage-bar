@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var displayTimer: Timer?
     private var clickMonitors: [Any] = []
     private var cancellables = Set<AnyCancellable>()
+    private var appearanceObservation: NSKeyValueObservation?
 
     /// Refresh coalescing: UsageSession's web-view load must not run re-entrantly
     /// (its single load continuation would be clobbered), so overlapping refresh
@@ -48,8 +49,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Belt-and-suspenders with LSUIElement: no Dock icon, menu-bar agent.
-        NSApp.setActivationPolicy(.accessory)
+        // Menu-bar agent by default (LSUIElement); "Show in Dock" flips the
+        // activation policy at runtime, no relaunch needed.
+        applyDockPresence()
+        appearanceObservation = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
+            Task { @MainActor in self?.updateDockIcon() }   // repaint the ring for light/dark
+        }
 
         setupStatusItem()
         setupPanel()
@@ -217,6 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if refreshTimer?.timeInterval != interval {
             startRefreshTimer()
         }
+        applyDockPresence()
         updateButton()
     }
 
@@ -354,6 +360,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = NSImage(systemSymbolName: "exclamationmark.triangle",
                                    accessibilityDescription: "Error")
         }
+        updateDockIcon()
     }
 
     /// Render the loaded state per the user's chosen menu-bar mode.
@@ -384,6 +391,101 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if hours >= 24 { return "\(hours / 24)d\(hours % 24)h" }
         if hours > 0 { return "\(hours)h\(minutes)m" }
         return "\(minutes)m"
+    }
+
+    // MARK: - Dock
+
+    /// Show or hide the app in the Dock per settings. Changing the activation
+    /// policy at runtime overrides the bundle's LSUIElement default, so no
+    /// relaunch is needed; the menu-bar item stays either way.
+    private func applyDockPresence() {
+        let policy: NSApplication.ActivationPolicy = settings.showInDock ? .regular : .accessory
+        if NSApp.activationPolicy() != policy {
+            NSApp.setActivationPolicy(policy)
+        }
+    }
+
+    /// Paint the Dock icon as a live usage ring (only while shown in the Dock);
+    /// fall back to the bundle's static icon whenever there's no usage to show.
+    private func updateDockIcon() {
+        guard settings.showInDock else { return }
+        if case .loaded(let usage) = store.state {
+            NSApp.applicationIconImage = dockIcon(for: usage)
+        } else {
+            NSApp.applicationIconImage = nil
+        }
+    }
+
+    /// A click on the Dock icon opens the dropdown — the app has no windows of
+    /// its own to bring forward (except the login window, which AppKit raises).
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if hasVisibleWindows { return true }
+        togglePanel()
+        return false
+    }
+
+    /// The Dock icon: a ring showing session usage with the number inside, on a
+    /// transparent background — the Dock supplies the tile, which keeps it as
+    /// compact as it gets. Colors resolve against the current appearance and the
+    /// icon is repainted on light/dark changes, so the number always reads.
+    private func dockIcon(for usage: Usage) -> NSImage {
+        let percent = min(100, max(0, usage.sessionPercent))
+        let ringColor: NSColor = percent >= settings.warnThreshold ? .systemOrange : .systemBlue
+        let appearance = NSApp.effectiveAppearance
+        let side: CGFloat = 256
+        let center = NSPoint(x: side / 2, y: side / 2)
+        let stroke = side * 0.105
+        let radius = side / 2 - stroke / 2 - side * 0.05
+
+        // "71" over a small "%". Lay out on the *visible* glyph block (cap
+        // heights), not the line boxes, so the pair sits optically centered.
+        let numberFont = Self.roundedFont(size: side * 0.30, weight: .bold)
+        let unitFont = Self.roundedFont(size: side * 0.12, weight: .semibold)
+        let number = NSAttributedString(string: "\(percent)", attributes: [
+            .font: numberFont, .foregroundColor: NSColor.labelColor])
+        let unit = NSAttributedString(string: "%", attributes: [
+            .font: unitFont, .foregroundColor: NSColor.secondaryLabelColor])
+        let gap = side * 0.03
+        let blockTop = center.y + (numberFont.capHeight + gap + unitFont.capHeight) / 2
+        let numberBaseline = blockTop - numberFont.capHeight
+        let unitBaseline = numberBaseline - gap - unitFont.capHeight
+        let numberOrigin = NSPoint(x: center.x - number.size().width / 2,
+                                   y: numberBaseline + numberFont.descender)
+        let unitOrigin = NSPoint(x: center.x - unit.size().width / 2,
+                                 y: unitBaseline + unitFont.descender)
+
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
+            appearance.performAsCurrentDrawingAppearance {
+                // Track, then the progress arc sweeping clockwise from 12 o'clock.
+                let track = NSBezierPath()
+                track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
+                track.lineWidth = stroke
+                NSColor.quaternaryLabelColor.setStroke()
+                track.stroke()
+
+                if percent > 0 {
+                    let arc = NSBezierPath()
+                    arc.appendArc(withCenter: center, radius: radius,
+                                  startAngle: 90, endAngle: 90 - 360 * CGFloat(percent) / 100,
+                                  clockwise: true)
+                    arc.lineWidth = stroke
+                    arc.lineCapStyle = .round
+                    ringColor.setStroke()
+                    arc.stroke()
+                }
+
+                number.draw(at: numberOrigin)
+                unit.draw(at: unitOrigin)
+            }
+            return true
+        }
+    }
+
+    private static func roundedFont(size: CGFloat, weight: NSFont.Weight) -> NSFont {
+        let base = NSFont.systemFont(ofSize: size, weight: weight)
+        guard let descriptor = base.fontDescriptor.withDesign(.rounded),
+              let rounded = NSFont(descriptor: descriptor, size: size) else { return base }
+        return rounded
     }
 
     // MARK: - Meter rendering

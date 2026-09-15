@@ -235,6 +235,7 @@ struct UsagePopoverView: View {
     private var settingsPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             Toggle("Launch at login", isOn: $settings.launchAtLogin)
+            Toggle("Show in Dock", isOn: $settings.showInDock)
             HStack {
                 Text("Refresh every").foregroundStyle(.secondary)
                 Spacer()
