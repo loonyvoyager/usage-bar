@@ -8,7 +8,7 @@
 A tiny native **macOS menu-bar app** that shows your current **claude.ai usage** at a
 glance — session %, weekly %, per-model split, reset countdowns, and pay-as-you-go
 credits — so you never have to open claude.ai → Settings → Usage. It sits by your
-clock: no Dock icon, no window.
+clock: no window, and no Dock icon unless you want one.
 
 > Glance up and see how much of your session you've burned and when it resets —
 > without breaking flow to go check the website.
