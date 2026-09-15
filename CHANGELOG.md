@@ -18,6 +18,9 @@ Notable changes to UsageBar. Format loosely follows
   and still picks up the warning tint. Its width is fixed to the widest possible
   label, so the status item never resizes as the numbers change.
 - GitHub Actions CI: an unsigned build on every push / pull request.
+- **Menu bar color** setting — Auto (follow the menu bar's own text color),
+  White, or Black — for bars where the system's choice reads poorly, such as a
+  vivid wallpaper it deems "light".
 
 ### Removed
 - The `Icon only` and `Icon + %` menu-bar styles — the picker is now just
@@ -25,6 +28,9 @@ Notable changes to UsageBar. Format loosely follows
   longer parses, so those installs migrate to `Meters` on next launch.
 
 ### Fixed
+- The orange warning tint never showed in the Meters style: `NSStatusBarButton`
+  doesn't reliably apply `contentTintColor` to images. Label colors are now drawn
+  into the image directly.
 - Overlapping refreshes (timer + manual + post-login) could race on the shared
   web view and leak a task; refreshes are now coalesced.
 - Menu-bar countdown kept ticking while a menu or drag was tracking, and the

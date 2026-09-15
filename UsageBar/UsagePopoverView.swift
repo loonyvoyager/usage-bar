@@ -237,6 +237,16 @@ struct UsagePopoverView: View {
             Toggle("Launch at login", isOn: $settings.launchAtLogin)
             Toggle("Show in Dock", isOn: $settings.showInDock)
             HStack {
+                Text("Menu bar color").foregroundStyle(.secondary)
+                Spacer()
+                Picker("", selection: $settings.menuBarColor) {
+                    ForEach(MenuBarColor.allCases) { color in
+                        Text(color.label).tag(color)
+                    }
+                }
+                .labelsHidden().fixedSize()
+            }
+            HStack {
                 Text("Refresh every").foregroundStyle(.secondary)
                 Spacer()
                 Picker("", selection: $settings.refreshIntervalMinutes) {

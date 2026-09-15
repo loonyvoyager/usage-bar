@@ -119,6 +119,22 @@ enum MenuBarMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// The color of the menu-bar label. `auto` renders a template image, taking the
+/// menu bar's own text color; the explicit options are for bars where that
+/// choice reads poorly (e.g. a vivid wallpaper the system deems "light").
+enum MenuBarColor: String, CaseIterable, Identifiable {
+    case auto, white, black
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .auto: return "Auto"
+        case .white: return "White"
+        case .black: return "Black"
+        }
+    }
+}
+
 /// Small persisted user settings (UserDefaults). Grown in Phase 4.
 @MainActor
 final class AppSettings: ObservableObject {
@@ -141,6 +157,14 @@ final class AppSettings: ObservableObject {
     @Published var warnThreshold: Int {
         didSet {
             UserDefaults.standard.set(warnThreshold, forKey: Keys.warnThreshold)
+            onChange?()
+        }
+    }
+
+    /// Label color in the menu bar (see `MenuBarColor`).
+    @Published var menuBarColor: MenuBarColor {
+        didSet {
+            UserDefaults.standard.set(menuBarColor.rawValue, forKey: Keys.menuBarColor)
             onChange?()
         }
     }
@@ -175,6 +199,7 @@ final class AppSettings: ObservableObject {
 
     private enum Keys {
         static let menuBarMode = "menuBarMode"
+        static let menuBarColor = "menuBarColor"
         static let refreshIntervalMinutes = "refreshIntervalMinutes"
         static let warnThreshold = "warnThreshold"
         static let showInDock = "showInDock"
@@ -187,6 +212,9 @@ final class AppSettings: ObservableObject {
         // anyone still stored on one quietly migrates to the default.
         let rawMode = defaults.string(forKey: Keys.menuBarMode)
         menuBarMode = rawMode.flatMap(MenuBarMode.init(rawValue:)) ?? .meters
+
+        let rawColor = defaults.string(forKey: Keys.menuBarColor)
+        menuBarColor = rawColor.flatMap(MenuBarColor.init(rawValue:)) ?? .auto
 
         let storedInterval = defaults.integer(forKey: Keys.refreshIntervalMinutes)   // 0 when unset
         refreshIntervalMinutes = Self.refreshChoices.contains(storedInterval) ? storedInterval : 5

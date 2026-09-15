@@ -337,7 +337,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateButton() {
         guard let button = statusItem.button else { return }
-        button.contentTintColor = nil               // reset; renderLoaded re-applies if over threshold
+        button.contentTintColor = nil               // labels draw their own colors (see labelColor)
         switch store.state {
         case .loaded(let usage):
             renderLoaded(button, usage)
@@ -361,20 +361,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Render the loaded state per the user's chosen menu-bar mode.
     private func renderLoaded(_ button: NSStatusBarButton, _ usage: Usage) {
-        button.contentTintColor = usage.sessionPercent >= settings.warnThreshold ? .systemOrange : nil
+        let color = labelColor(for: usage.sessionPercent)
         switch settings.menuBarMode {
         case .meters:
-            button.image = meterImage(for: usage)
+            button.image = meterImage(for: usage, color: color)
             button.imagePosition = .imageOnly
             button.title = ""
         case .percentTime:
             button.image = nil
             button.imagePosition = .noImage
-            if let left = timeLeft(usage.sessionReset) {
-                button.title = "\(usage.sessionPercent)%/\(left)"
+            let text = timeLeft(usage.sessionReset).map { "\(usage.sessionPercent)%/\($0)" }
+                ?? "\(usage.sessionPercent)%"
+            if let color {
+                button.attributedTitle = NSAttributedString(string: text, attributes: [
+                    .foregroundColor: color,
+                    .font: button.font ?? NSFont.menuBarFont(ofSize: 0)])
             } else {
-                button.title = "\(usage.sessionPercent)%"
+                button.title = text
             }
+        }
+    }
+
+    /// The explicit color for the menu-bar label, or nil to let the menu bar tint
+    /// a template with its own text color. Over the warn threshold it's orange
+    /// regardless of the color setting. Drawn explicitly rather than via
+    /// `contentTintColor`, which NSStatusBarButton doesn't reliably apply to images.
+    private func labelColor(for percent: Int) -> NSColor? {
+        if percent >= settings.warnThreshold { return .systemOrange }
+        switch settings.menuBarColor {
+        case .auto:  return nil
+        case .white: return .white
+        case .black: return .black
         }
     }
 
@@ -507,16 +524,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Draw the compact indicator: each window's percentage sitting above a small
     /// segmented bar — session first, weekly appended when the endpoint has it.
     ///
-    /// Drawn as a *template* image, so AppKit inverts it for light/dark menu bars
-    /// automatically and the over-threshold `contentTintColor` still applies.
-    private func meterImage(for usage: Usage) -> NSImage {
+    /// With `color` nil it's drawn as a *template* image, so AppKit paints it in
+    /// the menu bar's own text color; with a color it's drawn literally.
+    private func meterImage(for usage: Usage, color: NSColor?) -> NSImage {
+        let ink = color ?? .black                    // template: only alpha matters
         var percents = [usage.sessionPercent]
         if let weekly = usage.weeklyPercent { percents.append(weekly) }
 
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .semibold),
-            // Template rendering keys off alpha, not hue; black = fully opaque.
-            .foregroundColor: NSColor.black
+
+            .foregroundColor: ink
         ]
         let labels = percents.map { NSAttributedString(string: "\($0)%", attributes: attrs) }
         let lit = percents.map { Self.litSegments($0, of: Self.meterSegments) }
@@ -546,7 +564,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
                 var dotX = originX + (columnWidth - meterWidth) / 2
                 for segment in 0..<segments {
-                    NSColor.black.withAlphaComponent(segment < lit[index] ? 1.0 : 0.25).setFill()
+                    ink.withAlphaComponent(segment < lit[index] ? 1.0 : 0.25).setFill()
                     NSBezierPath(roundedRect: NSRect(x: dotX, y: 0,
                                                      width: dot.width, height: dot.height),
                                  xRadius: dot.width / 2,
@@ -556,7 +574,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return true
         }
-        image.isTemplate = true
+        image.isTemplate = (color == nil)
         image.accessibilityDescription = Self.meterAccessibilityText(for: usage)
         return image
     }
