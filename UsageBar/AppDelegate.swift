@@ -38,7 +38,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var displayTimer: Timer?
     private var clickMonitors: [Any] = []
     private var cancellables = Set<AnyCancellable>()
-    private var appearanceObservation: NSKeyValueObservation?
 
     /// Refresh coalescing: UsageSession's web-view load must not run re-entrantly
     /// (its single load continuation would be clobbered), so overlapping refresh
@@ -52,9 +51,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Menu-bar agent by default (LSUIElement); "Show in Dock" flips the
         // activation policy at runtime, no relaunch needed.
         applyDockPresence()
-        appearanceObservation = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
-            Task { @MainActor in self?.updateDockIcon() }   // repaint the ring for light/dark
-        }
 
         setupStatusItem()
         setupPanel()
@@ -425,27 +421,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The Dock icon: a ring showing session usage with the number inside, on a
-    /// transparent background — the Dock supplies the tile, which keeps it as
-    /// compact as it gets. Colors resolve against the current appearance and the
-    /// icon is repainted on light/dark changes, so the number always reads.
+    /// plain white tile so it reads on any wallpaper. The tile uses standard
+    /// macOS icon geometry (≈80% of the canvas, ~22% corner radius), so it sits
+    /// at the same visual size as its neighbors. Colors are fixed for white — a
+    /// white tile in dark mode still wants dark text — so nothing here tracks
+    /// the system appearance.
     private func dockIcon(for usage: Usage) -> NSImage {
         let percent = min(100, max(0, usage.sessionPercent))
-        let ringColor: NSColor = percent >= settings.warnThreshold ? .systemOrange : .systemBlue
-        let appearance = NSApp.effectiveAppearance
+        let ring = percent >= settings.warnThreshold
+            ? NSColor(srgbRed: 1.00, green: 0.584, blue: 0.00, alpha: 1)   // systemOrange
+            : NSColor(srgbRed: 0.00, green: 0.478, blue: 1.00, alpha: 1)   // systemBlue
         let side: CGFloat = 256
+        let tile = side * 0.8047
+        let inset = (side - tile) / 2
+        let tileRect = NSRect(x: inset, y: inset, width: tile, height: tile)
+        let corner = tile * 0.225
         let center = NSPoint(x: side / 2, y: side / 2)
-        let stroke = side * 0.105
-        let radius = side / 2 - stroke / 2 - side * 0.05
+        let stroke = tile * 0.105
+        let radius = tile / 2 - stroke / 2 - tile * 0.09
 
         // "71" over a small "%". Lay out on the *visible* glyph block (cap
         // heights), not the line boxes, so the pair sits optically centered.
-        let numberFont = Self.roundedFont(size: side * 0.30, weight: .bold)
-        let unitFont = Self.roundedFont(size: side * 0.12, weight: .semibold)
+        let numberFont = Self.roundedFont(size: tile * 0.30, weight: .bold)
+        let unitFont = Self.roundedFont(size: tile * 0.12, weight: .semibold)
         let number = NSAttributedString(string: "\(percent)", attributes: [
-            .font: numberFont, .foregroundColor: NSColor.labelColor])
+            .font: numberFont, .foregroundColor: NSColor(white: 0.13, alpha: 1)])
         let unit = NSAttributedString(string: "%", attributes: [
-            .font: unitFont, .foregroundColor: NSColor.secondaryLabelColor])
-        let gap = side * 0.03
+            .font: unitFont, .foregroundColor: NSColor(white: 0.45, alpha: 1)])
+        let gap = tile * 0.03
         let blockTop = center.y + (numberFont.capHeight + gap + unitFont.capHeight) / 2
         let numberBaseline = blockTop - numberFont.capHeight
         let unitBaseline = numberBaseline - gap - unitFont.capHeight
@@ -455,28 +458,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                  y: unitBaseline + unitFont.descender)
 
         return NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
-            appearance.performAsCurrentDrawingAppearance {
-                // Track, then the progress arc sweeping clockwise from 12 o'clock.
-                let track = NSBezierPath()
-                track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
-                track.lineWidth = stroke
-                NSColor.quaternaryLabelColor.setStroke()
-                track.stroke()
+            // White tile with a faint edge so it still reads on a white wallpaper.
+            let tilePath = NSBezierPath(roundedRect: tileRect, xRadius: corner, yRadius: corner)
+            NSColor.white.setFill()
+            tilePath.fill()
+            tilePath.lineWidth = side * 0.008
+            NSColor(white: 0, alpha: 0.12).setStroke()
+            tilePath.stroke()
 
-                if percent > 0 {
-                    let arc = NSBezierPath()
-                    arc.appendArc(withCenter: center, radius: radius,
-                                  startAngle: 90, endAngle: 90 - 360 * CGFloat(percent) / 100,
-                                  clockwise: true)
-                    arc.lineWidth = stroke
-                    arc.lineCapStyle = .round
-                    ringColor.setStroke()
-                    arc.stroke()
-                }
+            // Track, then the progress arc sweeping clockwise from 12 o'clock.
+            let track = NSBezierPath()
+            track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
+            track.lineWidth = stroke
+            NSColor(white: 0, alpha: 0.10).setStroke()
+            track.stroke()
 
-                number.draw(at: numberOrigin)
-                unit.draw(at: unitOrigin)
+            if percent > 0 {
+                let arc = NSBezierPath()
+                arc.appendArc(withCenter: center, radius: radius,
+                              startAngle: 90, endAngle: 90 - 360 * CGFloat(percent) / 100,
+                              clockwise: true)
+                arc.lineWidth = stroke
+                arc.lineCapStyle = .round
+                ring.setStroke()
+                arc.stroke()
             }
+
+            number.draw(at: numberOrigin)
+            unit.draw(at: unitOrigin)
             return true
         }
     }

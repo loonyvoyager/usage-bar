@@ -7,10 +7,10 @@ Notable changes to UsageBar. Format loosely follows
 
 ### Added
 - **Show in Dock** (off by default) — the app appears in the Dock and its icon
-  becomes a live ring of the session %, number in the middle, on a transparent
-  background so the Dock's own tile is the chrome. Blue normally, orange past the
-  warning threshold; repainted on light/dark changes; clicking it opens the
-  dropdown. Toggling it flips the activation policy at runtime — no relaunch.
+  becomes a live ring of the session %, number in the middle, on a plain white
+  tile so it reads on any wallpaper. Blue normally, orange past the warning
+  threshold; clicking it opens the dropdown. Toggling it flips the activation
+  policy at runtime — no relaunch.
 - **Meters** menu-bar style, now the **default** for new installs — the session
   window (and the weekly one, when claude.ai exposes it) drawn as a percentage
   above a small segmented bar.
