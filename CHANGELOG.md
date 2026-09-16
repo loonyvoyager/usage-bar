@@ -3,7 +3,7 @@
 Notable changes to UsageBar. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions track app releases.
 
-## [0.1.1] — unreleased
+## [0.1.1] — 2026-09-16
 
 ### Added
 - **Show in Dock** (off by default) — the app appears in the Dock and its icon
