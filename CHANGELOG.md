@@ -6,6 +6,9 @@ Notable changes to UsageBar. Format loosely follows
 ## [0.1.1] — 2026-09-16
 
 ### Added
+- First **notarized** release — Apple has enabled notarization for the account,
+  so the dmg opens with no Gatekeeper prompt (the one-time "Open Anyway" step
+  from 0.1.0 is gone).
 - **Show in Dock** (off by default) — the app appears in the Dock and its icon
   becomes a live ring of the session %, number in the middle, on a plain white
   tile so it reads on any wallpaper. Blue normally, orange past the warning
