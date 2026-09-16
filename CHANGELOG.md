@@ -18,9 +18,10 @@ Notable changes to UsageBar. Format loosely follows
   and still picks up the warning tint. Its width is fixed to the widest possible
   label, so the status item never resizes as the numbers change.
 - GitHub Actions CI: an unsigned build on every push / pull request.
-- The Dock ring's tile now **follows the system appearance** — white with dark
-  ink in Light, dark with light ink in Dark (Apple's per-mode blue and orange) —
-  and repaints the moment the theme changes.
+- The Dock ring's tile now follows macOS 26's **Icon & widget style** (System
+  Settings → Appearance): Default, Dark, Clear (frosted glass) or Tinted
+  (monochrome in your tint), each with its light/dark base and the Auto option —
+  and repaints the moment the setting or the light/dark mode changes.
 - **Menu bar color** setting — Auto (follow the menu bar's own text color),
   White, or Black — for bars where the system's choice reads poorly, such as a
   vivid wallpaper it deems "light".

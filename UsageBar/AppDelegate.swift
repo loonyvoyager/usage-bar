@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var clickMonitors: [Any] = []
     private var cancellables = Set<AnyCancellable>()
     private var appearanceObservation: NSKeyValueObservation?
+    private var iconStyleObservations: [NSKeyValueObservation] = []
 
     /// Refresh coalescing: UsageSession's web-view load must not run re-entrantly
     /// (its single load continuation would be clobbered), so overlapping refresh
@@ -52,11 +53,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Menu-bar agent by default (LSUIElement); "Show in Dock" flips the
         // activation policy at runtime, no relaunch needed.
         applyDockPresence()
-        // The Dock tile follows the system appearance; repaint when it changes
-        // (including Auto's sunset switch).
+        // The Dock tile follows Tahoe's "Icon & widget style" and light/dark
+        // mode; repaint when either changes. UserDefaults KVO fires for edits
+        // made in System Settings, and the 60 s display tick backstops it.
         appearanceObservation = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
             Task { @MainActor in self?.updateDockIcon() }
         }
+        iconStyleObservations = [
+            UserDefaults.standard.observe(\.AppleIconAppearanceTheme) { [weak self] _, _ in
+                Task { @MainActor in self?.updateDockIcon() }
+            },
+            UserDefaults.standard.observe(\.AppleIconAppearanceTintColor) { [weak self] _, _ in
+                Task { @MainActor in self?.updateDockIcon() }
+            },
+        ]
 
         setupStatusItem()
         setupPanel()
@@ -444,16 +454,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The Dock icon: a ring showing session usage with the number inside, on a tile
-    /// that follows the system appearance — white with dark ink in Light, dark
-    /// with light ink in Dark — using Apple's per-mode blue and orange. Standard
-    /// macOS icon geometry (≈80% of the canvas, ~22% corner radius) keeps it the
-    /// same visual size as its neighbors. Re-rendered whenever the appearance
-    /// changes (see `appearanceObservation`).
+    /// styled to match Tahoe's "Icon & widget style" (System Settings → Appearance)
+    /// — Default, Dark, Clear (frosted glass), or Tinted (monochrome in the user's
+    /// tint) — and its light/dark base. macOS restyles asset-catalog icons for that
+    /// setting automatically, but a runtime `applicationIconImage` is a plain
+    /// bitmap, so we read the setting and render to match (see `IconStyle`).
+    /// Standard macOS icon geometry (≈80% of the canvas, ~22% corner radius) keeps
+    /// it the same visual size as its neighbors.
     private func dockIcon(for usage: Usage) -> NSImage {
         let percent = min(100, max(0, usage.sessionPercent))
-        let dark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        let palette = DockPalette(dark: dark)
-        let ring = percent >= settings.warnThreshold ? palette.orange : palette.blue
+        let palette = DockPalette.make(for: IconStyle.current())
+        let ring = percent >= settings.warnThreshold ? palette.ringWarn : palette.ring
         let side: CGFloat = 256
         let tile = side * 0.8047
         let inset = (side - tile) / 2
@@ -513,28 +524,96 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Dock-tile colors per appearance. The blue/orange are Apple's Light- and
+    /// Tahoe's "Icon & widget style", read from NSGlobalDomain. The style and its
+    /// light/dark base are stored as one compound string (observed: `ClearDark`),
+    /// parsed tolerantly by keyword so any spelling of the variants works:
+    /// `Tinted` / `Clear` / `Dark` / anything else = Default for the style;
+    /// `Light` / `Dark` for the base; `Auto` (or no explicit base) = follow the
+    /// system appearance. Default icons never darken, matching the system's own.
+    private struct IconStyle {
+        enum Kind { case regular, dark, clear, tinted }
+        let kind: Kind
+        let darkBase: Bool
+        let tint: NSColor
+
+        @MainActor static func current() -> IconStyle {
+            let defaults = UserDefaults.standard
+            let raw = (defaults.AppleIconAppearanceTheme ?? "").lowercased()
+            let systemDark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+
+            let kind: Kind = raw.contains("tinted") ? .tinted
+                           : raw.contains("clear")  ? .clear
+                           : raw.contains("dark")   ? .dark
+                           : .regular
+            let darkBase: Bool
+            switch kind {
+            case .regular:
+                darkBase = false
+            case .dark:
+                darkBase = raw.contains("auto") ? systemDark : true
+            case .clear, .tinted:
+                if raw.contains("auto")       { darkBase = systemDark }
+                else if raw.contains("light") { darkBase = false }
+                else if raw.contains("dark")  { darkBase = true }
+                else                          { darkBase = systemDark }
+            }
+            return IconStyle(kind: kind, darkBase: darkBase,
+                             tint: tintColor(named: defaults.AppleIconAppearanceTintColor ?? ""))
+        }
+
+        /// The tint picker stores an accent-color name; unknown names fall back
+        /// to the current accent color.
+        private static func tintColor(named name: String) -> NSColor {
+            switch name.lowercased() {
+            case "blue":     return NSColor(srgbRed: 0.000, green: 0.478, blue: 1.000, alpha: 1)
+            case "purple":   return NSColor(srgbRed: 0.686, green: 0.322, blue: 0.871, alpha: 1)
+            case "pink":     return NSColor(srgbRed: 1.000, green: 0.176, blue: 0.333, alpha: 1)
+            case "red":      return NSColor(srgbRed: 1.000, green: 0.231, blue: 0.188, alpha: 1)
+            case "orange":   return NSColor(srgbRed: 1.000, green: 0.584, blue: 0.000, alpha: 1)
+            case "yellow":   return NSColor(srgbRed: 1.000, green: 0.800, blue: 0.000, alpha: 1)
+            case "green":    return NSColor(srgbRed: 0.157, green: 0.804, blue: 0.255, alpha: 1)
+            case "graphite": return NSColor(srgbRed: 0.557, green: 0.557, blue: 0.576, alpha: 1)
+            default:         return NSColor.controlAccentColor
+            }
+        }
+    }
+
+    /// Dock-tile colors for an icon style. Blue/orange are Apple's Light- and
     /// Dark-mode system colors, fixed here so the icon doesn't depend on which
     /// appearance happens to be current when the image is later rasterized.
     private struct DockPalette {
-        let tile, edge, track, number, unit, blue, orange: NSColor
-        init(dark: Bool) {
-            if dark {
-                tile   = NSColor(white: 0.14, alpha: 1)
-                edge   = NSColor(white: 1, alpha: 0.10)
-                track  = NSColor(white: 1, alpha: 0.16)
-                number = NSColor(white: 0.95, alpha: 1)
-                unit   = NSColor(white: 0.62, alpha: 1)
-                blue   = NSColor(srgbRed: 10 / 255, green: 132 / 255, blue: 1, alpha: 1)
-                orange = NSColor(srgbRed: 1, green: 159 / 255, blue: 10 / 255, alpha: 1)
-            } else {
-                tile   = .white
-                edge   = NSColor(white: 0, alpha: 0.12)
-                track  = NSColor(white: 0, alpha: 0.10)
-                number = NSColor(white: 0.13, alpha: 1)
-                unit   = NSColor(white: 0.45, alpha: 1)
-                blue   = NSColor(srgbRed: 0, green: 0.478, blue: 1, alpha: 1)
-                orange = NSColor(srgbRed: 1, green: 0.584, blue: 0, alpha: 1)
+        let tile, edge, track, number, unit, ring, ringWarn: NSColor
+
+        static func make(for style: IconStyle) -> DockPalette {
+            let dark = style.darkBase
+            let number = dark ? NSColor(white: 0.95, alpha: 1) : NSColor(white: 0.13, alpha: 1)
+            let unit   = dark ? NSColor(white: 0.62, alpha: 1) : NSColor(white: 0.45, alpha: 1)
+            let track  = dark ? NSColor(white: 1, alpha: 0.16) : NSColor(white: 0, alpha: 0.10)
+            let blue   = dark ? NSColor(srgbRed: 10 / 255, green: 132 / 255, blue: 1, alpha: 1)
+                              : NSColor(srgbRed: 0, green: 0.478, blue: 1, alpha: 1)
+            let orange = dark ? NSColor(srgbRed: 1, green: 159 / 255, blue: 10 / 255, alpha: 1)
+                              : NSColor(srgbRed: 1, green: 0.584, blue: 0, alpha: 1)
+            let solidTile = dark ? NSColor(white: 0.14, alpha: 1) : NSColor.white
+            let solidEdge = dark ? NSColor(white: 1, alpha: 0.10) : NSColor(white: 0, alpha: 0.12)
+
+            switch style.kind {
+            case .regular, .dark:
+                return DockPalette(tile: solidTile, edge: solidEdge, track: track,
+                                   number: number, unit: unit, ring: blue, ringWarn: orange)
+            case .clear:
+                // Frosted glass: the Dock shows through the tile.
+                return DockPalette(tile: dark ? NSColor(white: 0, alpha: 0.42) : NSColor(white: 1, alpha: 0.58),
+                                   edge: NSColor(white: 1, alpha: dark ? 0.16 : 0.55),
+                                   track: track, number: number, unit: unit, ring: blue, ringWarn: orange)
+            case .tinted:
+                // Monochrome in the user's tint — deepened a little on a light base
+                // so pale tints stay legible. The warning stays orange on purpose.
+                let ink = dark ? style.tint
+                               : (style.tint.blended(withFraction: 0.30, of: .black) ?? style.tint)
+                return DockPalette(tile: solidTile, edge: solidEdge,
+                                   track: ink.withAlphaComponent(0.28),
+                                   number: ink, unit: ink.withAlphaComponent(0.75),
+                                   ring: ink, ringWarn: orange)
             }
         }
     }
@@ -629,4 +708,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// can dismiss on outside clicks. Borderless windows can't become key by default.
 final class KeyPanel: NSPanel {
     override var canBecomeKey: Bool { true }
+}
+
+/// KVO-able views of Tahoe's icon-style defaults (NSGlobalDomain), so
+/// `UserDefaults.observe(\.…)` can watch them. The property names must equal
+/// the default keys for the observation to bind.
+extension UserDefaults {
+    @objc dynamic var AppleIconAppearanceTheme: String? { string(forKey: "AppleIconAppearanceTheme") }
+    @objc dynamic var AppleIconAppearanceTintColor: String? { string(forKey: "AppleIconAppearanceTintColor") }
 }
