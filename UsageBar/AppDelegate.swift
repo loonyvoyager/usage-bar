@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var displayTimer: Timer?
     private var clickMonitors: [Any] = []
     private var cancellables = Set<AnyCancellable>()
+    private var appearanceObservation: NSKeyValueObservation?
 
     /// Refresh coalescing: UsageSession's web-view load must not run re-entrantly
     /// (its single load continuation would be clobbered), so overlapping refresh
@@ -51,6 +52,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Menu-bar agent by default (LSUIElement); "Show in Dock" flips the
         // activation policy at runtime, no relaunch needed.
         applyDockPresence()
+        // The Dock tile follows the system appearance; repaint when it changes
+        // (including Auto's sunset switch).
+        appearanceObservation = NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
+            Task { @MainActor in self?.updateDockIcon() }
+        }
 
         setupStatusItem()
         setupPanel()
@@ -437,17 +443,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    /// The Dock icon: a ring showing session usage with the number inside, on a
-    /// plain white tile so it reads on any wallpaper. The tile uses standard
-    /// macOS icon geometry (≈80% of the canvas, ~22% corner radius), so it sits
-    /// at the same visual size as its neighbors. Colors are fixed for white — a
-    /// white tile in dark mode still wants dark text — so nothing here tracks
-    /// the system appearance.
+    /// The Dock icon: a ring showing session usage with the number inside, on a tile
+    /// that follows the system appearance — white with dark ink in Light, dark
+    /// with light ink in Dark — using Apple's per-mode blue and orange. Standard
+    /// macOS icon geometry (≈80% of the canvas, ~22% corner radius) keeps it the
+    /// same visual size as its neighbors. Re-rendered whenever the appearance
+    /// changes (see `appearanceObservation`).
     private func dockIcon(for usage: Usage) -> NSImage {
         let percent = min(100, max(0, usage.sessionPercent))
-        let ring = percent >= settings.warnThreshold
-            ? NSColor(srgbRed: 1.00, green: 0.584, blue: 0.00, alpha: 1)   // systemOrange
-            : NSColor(srgbRed: 0.00, green: 0.478, blue: 1.00, alpha: 1)   // systemBlue
+        let dark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let palette = DockPalette(dark: dark)
+        let ring = percent >= settings.warnThreshold ? palette.orange : palette.blue
         let side: CGFloat = 256
         let tile = side * 0.8047
         let inset = (side - tile) / 2
@@ -462,9 +468,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let numberFont = Self.roundedFont(size: tile * 0.30, weight: .bold)
         let unitFont = Self.roundedFont(size: tile * 0.12, weight: .semibold)
         let number = NSAttributedString(string: "\(percent)", attributes: [
-            .font: numberFont, .foregroundColor: NSColor(white: 0.13, alpha: 1)])
+            .font: numberFont, .foregroundColor: palette.number])
         let unit = NSAttributedString(string: "%", attributes: [
-            .font: unitFont, .foregroundColor: NSColor(white: 0.45, alpha: 1)])
+            .font: unitFont, .foregroundColor: palette.unit])
         let gap = tile * 0.03
         let blockTop = center.y + (numberFont.capHeight + gap + unitFont.capHeight) / 2
         let numberBaseline = blockTop - numberFont.capHeight
@@ -475,19 +481,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                  y: unitBaseline + unitFont.descender)
 
         return NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
-            // White tile with a faint edge so it still reads on a white wallpaper.
+            // The tile, with a faint edge so it still reads on a same-tone wallpaper.
             let tilePath = NSBezierPath(roundedRect: tileRect, xRadius: corner, yRadius: corner)
-            NSColor.white.setFill()
+            palette.tile.setFill()
             tilePath.fill()
             tilePath.lineWidth = side * 0.008
-            NSColor(white: 0, alpha: 0.12).setStroke()
+            palette.edge.setStroke()
             tilePath.stroke()
 
             // Track, then the progress arc sweeping clockwise from 12 o'clock.
             let track = NSBezierPath()
             track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
             track.lineWidth = stroke
-            NSColor(white: 0, alpha: 0.10).setStroke()
+            palette.track.setStroke()
             track.stroke()
 
             if percent > 0 {
@@ -504,6 +510,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             number.draw(at: numberOrigin)
             unit.draw(at: unitOrigin)
             return true
+        }
+    }
+
+    /// Dock-tile colors per appearance. The blue/orange are Apple's Light- and
+    /// Dark-mode system colors, fixed here so the icon doesn't depend on which
+    /// appearance happens to be current when the image is later rasterized.
+    private struct DockPalette {
+        let tile, edge, track, number, unit, blue, orange: NSColor
+        init(dark: Bool) {
+            if dark {
+                tile   = NSColor(white: 0.14, alpha: 1)
+                edge   = NSColor(white: 1, alpha: 0.10)
+                track  = NSColor(white: 1, alpha: 0.16)
+                number = NSColor(white: 0.95, alpha: 1)
+                unit   = NSColor(white: 0.62, alpha: 1)
+                blue   = NSColor(srgbRed: 10 / 255, green: 132 / 255, blue: 1, alpha: 1)
+                orange = NSColor(srgbRed: 1, green: 159 / 255, blue: 10 / 255, alpha: 1)
+            } else {
+                tile   = .white
+                edge   = NSColor(white: 0, alpha: 0.12)
+                track  = NSColor(white: 0, alpha: 0.10)
+                number = NSColor(white: 0.13, alpha: 1)
+                unit   = NSColor(white: 0.45, alpha: 1)
+                blue   = NSColor(srgbRed: 0, green: 0.478, blue: 1, alpha: 1)
+                orange = NSColor(srgbRed: 1, green: 0.584, blue: 0, alpha: 1)
+            }
         }
     }
 
