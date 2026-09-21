@@ -474,22 +474,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let stroke = tile * 0.105
         let radius = tile / 2 - stroke / 2 - tile * 0.09
 
-        // "71" over a small "%". Lay out on the *visible* glyph block (cap
-        // heights), not the line boxes, so the pair sits optically centered.
+        // "71" with a small "%" below it (layout note further down).
         let numberFont = Self.roundedFont(size: tile * 0.30, weight: .bold)
         let unitFont = Self.roundedFont(size: tile * 0.12, weight: .semibold)
         let number = NSAttributedString(string: "\(percent)", attributes: [
             .font: numberFont, .foregroundColor: palette.number])
         let unit = NSAttributedString(string: "%", attributes: [
             .font: unitFont, .foregroundColor: palette.unit])
-        let gap = tile * 0.03
-        let blockTop = center.y + (numberFont.capHeight + gap + unitFont.capHeight) / 2
-        let numberBaseline = blockTop - numberFont.capHeight
-        let unitBaseline = numberBaseline - gap - unitFont.capHeight
+        // Vertical layout follows Codex's own Dock ring: the number rides a little
+        // above the ring's center and the small "%" sits low, near the bottom of
+        // the ring's interior, with clear air between them. Positions are set on
+        // the visible glyph blocks (cap heights), not the line boxes.
+        let inner = radius - stroke / 2
+        let numberCenterY = center.y + inner * 0.12
+        let unitCenterY = center.y - inner * 0.68
         let numberOrigin = NSPoint(x: center.x - number.size().width / 2,
-                                   y: numberBaseline + numberFont.descender)
+                                   y: numberCenterY - numberFont.capHeight / 2 + numberFont.descender)
         let unitOrigin = NSPoint(x: center.x - unit.size().width / 2,
-                                 y: unitBaseline + unitFont.descender)
+                                 y: unitCenterY - unitFont.capHeight / 2 + unitFont.descender)
 
         return NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
             // The tile, with a faint edge so it still reads on a same-tone wallpaper.

@@ -1,0 +1,5 @@
+/* The name shown in the Dock, Finder and the app switcher. Finder only honors
+   it when the Info.plist's CFBundleDisplayName equals the on-disk name and
+   LSHasLocalizedDisplayName is set — both are, in Info.plist. */
+CFBundleDisplayName = "Claude";
+CFBundleName = "Claude";

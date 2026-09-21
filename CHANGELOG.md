@@ -3,6 +3,15 @@
 Notable changes to UsageBar. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions track app releases.
 
+## [Unreleased]
+
+### Changed
+- Dock ring layout now matches Codex's own Dock ring: the number rides above the
+  ring's center and the small `%` sits low, with clear air between them.
+- The app's display name — what the Dock, Finder and the app switcher show — is
+  now **Claude** (a localized display name; the bundle is still `UsageBar.app`,
+  and the menu-bar panel still says Usage Bar).
+
 ## [0.1.1] — 2026-09-16
 
 ### Added
