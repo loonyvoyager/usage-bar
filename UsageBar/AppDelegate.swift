@@ -475,19 +475,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let radius = tile / 2 - stroke / 2 - tile * 0.09
 
         // "71" with a small "%" below it (layout note further down).
-        let numberFont = Self.roundedFont(size: tile * 0.30, weight: .bold)
-        let unitFont = Self.roundedFont(size: tile * 0.12, weight: .semibold)
+        let numberFont = Self.roundedFont(size: tile * 0.26, weight: .bold)
+        let unitFont = Self.roundedFont(size: tile * 0.15, weight: .semibold)
         let number = NSAttributedString(string: "\(percent)", attributes: [
             .font: numberFont, .foregroundColor: palette.number])
         let unit = NSAttributedString(string: "%", attributes: [
             .font: unitFont, .foregroundColor: palette.unit])
-        // Vertical layout follows Codex's own Dock ring: the number rides a little
-        // above the ring's center and the small "%" sits low, near the bottom of
-        // the ring's interior, with clear air between them. Positions are set on
-        // the visible glyph blocks (cap heights), not the line boxes.
+        // Layout measured off Codex's own Dock ring: the number sits at the ring's
+        // center, and the "%" sits ON the ring band at 6 o'clock, straddling the
+        // track's inner edge (it's drawn after the ring, so it reads over the track
+        // and the arc alike). Positions are set on the visible glyph blocks (cap
+        // heights), not the line boxes.
         let inner = radius - stroke / 2
-        let numberCenterY = center.y + inner * 0.12
-        let unitCenterY = center.y - inner * 0.68
+        let numberCenterY = center.y + inner * 0.05
+        let unitCenterY = center.y - inner * 1.05
         let numberOrigin = NSPoint(x: center.x - number.size().width / 2,
                                    y: numberCenterY - numberFont.capHeight / 2 + numberFont.descender)
         let unitOrigin = NSPoint(x: center.x - unit.size().width / 2,
