@@ -52,6 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Menu-bar agent by default (LSUIElement); "Show in Dock" flips the
         // activation policy at runtime, no relaunch needed.
+        Self.registerBundledFonts()
         applyDockPresence()
         // The Dock tile follows Tahoe's "Icon & widget style" and light/dark
         // mode; repaint when either changes. UserDefaults KVO fires for edits
@@ -475,8 +476,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let radius = tile / 2 - stroke / 2 - tile * 0.09
 
         // "71" with a small "%" below it (layout note further down).
-        let numberFont = Self.roundedFont(size: tile * 0.26, weight: .bold)
-        let unitFont = Self.roundedFont(size: tile * 0.15, weight: .semibold)
+        let numberFont = Self.displayFont("SpaceGrotesk-Bold", size: tile * 0.26, weight: .bold)
+        let unitFont = Self.displayFont("SpaceGrotesk-Medium", size: tile * 0.15, weight: .semibold)
         let number = NSAttributedString(string: "\(percent)", attributes: [
             .font: numberFont, .foregroundColor: palette.number])
         let unit = NSAttributedString(string: "%", attributes: [
@@ -494,6 +495,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let unitOrigin = NSPoint(x: center.x - unit.size().width / 2,
                                  y: unitCenterY - unitFont.capHeight / 2 + unitFont.descender)
 
+        // The ring breaks around the "%" so the two never overlap: a gap wide
+        // enough for the glyph — plus the round cap's own angular width — is cut
+        // out of BOTH the track and the arc at 6 o'clock. Percentages still map
+        // to true angles; the gap is a window, not a shortened scale, so a full
+        // ring still means 100%.
+        let gapHalf = Self.degrees(atan2(unit.size().width / 2 + stroke * 0.42, radius))
+        let capHalf = Self.degrees(atan2(stroke / 2, radius))
+
         return NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
             // The tile, with a faint edge so it still reads on a same-tone wallpaper.
             let tilePath = NSBezierPath(roundedRect: tileRect, xRadius: corner, yRadius: corner)
@@ -503,22 +512,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             palette.edge.setStroke()
             tilePath.stroke()
 
-            // Track, then the progress arc sweeping clockwise from 12 o'clock.
-            let track = NSBezierPath()
-            track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
-            track.lineWidth = stroke
-            palette.track.setStroke()
-            track.stroke()
+            // `t` below is the clockwise sweep from 12 o'clock, so the gap sits
+            // at t = 180 ± gapHalf. Ends that land on a gap edge are pulled back
+            // by capHalf, so the round cap finishes exactly at the edge.
+            func band(_ from: CGFloat, _ to: CGFloat, _ color: NSColor) {
+                guard to - from > 0.5 else { return }
+                let path = NSBezierPath()
+                path.appendArc(withCenter: center, radius: radius,
+                               startAngle: 90 - from, endAngle: 90 - to, clockwise: true)
+                path.lineWidth = stroke
+                path.lineCapStyle = .round
+                color.setStroke()
+                path.stroke()
+            }
+
+            band(180 + gapHalf + capHalf, 540 - gapHalf - capHalf, palette.track)
 
             if percent > 0 {
-                let arc = NSBezierPath()
-                arc.appendArc(withCenter: center, radius: radius,
-                              startAngle: 90, endAngle: 90 - 360 * CGFloat(percent) / 100,
-                              clockwise: true)
-                arc.lineWidth = stroke
-                arc.lineCapStyle = .round
-                ring.setStroke()
-                arc.stroke()
+                let sweep = 360 * CGFloat(percent) / 100
+                let gapStart = 180 - gapHalf, gapEnd = 180 + gapHalf
+                if sweep <= gapStart {
+                    band(0, sweep, ring)
+                } else {
+                    band(0, gapStart - capHalf, ring)
+                    if sweep > gapEnd { band(gapEnd + capHalf, sweep, ring) }
+                }
             }
 
             number.draw(at: numberOrigin)
@@ -619,6 +637,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                    ring: ink, ringWarn: orange)
             }
         }
+    }
+
+    private static func degrees(_ radians: CGFloat) -> CGFloat { radians * 180 / .pi }
+
+    /// Space Grotesk (SIL OFL 1.1) ships inside the bundle and is registered for
+    /// this process only. If it's ever missing, `displayFont` quietly falls back
+    /// to the rounded system font rather than failing to draw.
+    private static func registerBundledFonts() {
+        guard let url = Bundle.main.url(forResource: "SpaceGrotesk", withExtension: "ttf") else {
+            NSLog("Space Grotesk not found in the bundle; using the system font")
+            return
+        }
+        var error: Unmanaged<CFError>?
+        if !CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) {
+            let message = error?.takeRetainedValue().localizedDescription ?? "unknown error"
+            NSLog("Space Grotesk could not be registered (%@); using the system font", message)
+        }
+    }
+
+    private static func displayFont(_ name: String, size: CGFloat, weight: NSFont.Weight) -> NSFont {
+        NSFont(name: name, size: size) ?? roundedFont(size: size, weight: weight)
     }
 
     private static func roundedFont(size: CGFloat, weight: NSFont.Weight) -> NSFont {

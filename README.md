@@ -113,6 +113,11 @@ by, or sponsored by Anthropic.** "Claude" and the Claude logo are trademarks of
 Anthropic. The app reads an internal claude.ai endpoint that has no public API and
 may change or break at any time; use it at your own discretion.
 
+## Credits
+
+The Dock icon is set in [Space Grotesk](https://github.com/floriankarsten/space-grotesk)
+by Florian Karsten, bundled under the [SIL Open Font License 1.1](UsageBar/Fonts/SpaceGrotesk-OFL.txt).
+
 ## License
 
 [MIT](LICENSE) © 2026 Grigorii Lapin.

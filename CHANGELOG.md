@@ -6,8 +6,13 @@ Notable changes to UsageBar. Format loosely follows
 ## [Unreleased]
 
 ### Changed
-- Dock ring layout now matches Codex's own Dock ring: the number rides above the
-  ring's center and the small `%` sits low, with clear air between them.
+- Dock ring redrawn to match Codex's own: the number sits at the ring's center
+  and the `%` sits on the ring band below it. The ring now **breaks around the
+  `%`** — a gap is cut from both the track and the arc — so the two never
+  overlap at high percentages. Percentages still map to true angles; the gap is
+  a window, not a shortened scale.
+- The Dock icon is now set in **Space Grotesk** (bundled, SIL OFL 1.1), falling
+  back to the rounded system font if it can't be registered.
 - The app's display name — what the Dock, Finder and the app switcher show — is
   now **Claude** (a localized display name; the bundle is still `UsageBar.app`,
   and the menu-bar panel still says Usage Bar).
