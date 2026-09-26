@@ -262,6 +262,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         isRefreshing = true
+        store.isRefreshing = true
 
         // Don't flash a spinner over good data on periodic refreshes.
         if store.latest == nil {
@@ -271,6 +272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             defer {
                 isRefreshing = false
+                store.isRefreshing = refreshQueued
                 if refreshQueued {
                     refreshQueued = false
                     refresh()
@@ -380,6 +382,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func renderLoaded(_ button: NSStatusBarButton, _ usage: Usage) {
         let color = labelColor(for: usage.sessionPercent)
         switch settings.menuBarMode {
+        case .signal:
+            button.image = signalImage(percent: usage.sessionPercent, color: color)
+            button.imagePosition = .imageOnly
+            button.title = ""
         case .meters:
             button.image = meterImage(for: usage, color: color)
             button.imagePosition = .imageOnly
@@ -665,6 +671,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let descriptor = base.fontDescriptor.withDesign(.rounded),
               let rounded = NSFont(descriptor: descriptor, size: size) else { return base }
         return rounded
+    }
+
+    /// The "Signal" style: an SF Symbol filled to the current percentage via its
+    /// variable value, with the number beside it. Composed into a single image so
+    /// it honors the menu-bar color setting exactly like the meter does — drawn as
+    /// a template when the color is nil, literally when it isn't.
+    private func signalImage(percent: Int, color: NSColor?) -> NSImage {
+        let value = min(100, max(0, percent))
+        let ink = color ?? .black
+        let symbol = NSImage(systemSymbolName: "cellularbars",
+                             variableValue: Double(value) / 100,
+                             accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .medium))
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular),
+            .foregroundColor: ink
+        ]
+        let text = NSAttributedString(string: " \(value)%", attributes: attributes)
+        let symbolSize = symbol?.size ?? .zero
+        // Reserve the widest label so the item doesn't resize as the value ticks.
+        let widest = NSAttributedString(string: " 100%", attributes: attributes).size().width
+        let size = NSSize(width: (symbolSize.width + widest).rounded(.up),
+                          height: max(symbolSize.height, text.size().height).rounded(.up))
+
+        let image = NSImage(size: size, flipped: false) { _ in
+            if let symbol {
+                let rect = NSRect(x: 0, y: (size.height - symbolSize.height) / 2,
+                                  width: symbolSize.width, height: symbolSize.height)
+                symbol.draw(in: rect)
+                ink.set()
+                rect.fill(using: .sourceAtop)      // tint the template glyph
+            }
+            text.draw(at: NSPoint(x: symbolSize.width, y: (size.height - text.size().height) / 2))
+            return true
+        }
+        image.isTemplate = (color == nil)
+        image.accessibilityDescription = "claude.ai usage \(value)%"
+        return image
     }
 
     // MARK: - Meter rendering

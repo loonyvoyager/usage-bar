@@ -68,13 +68,44 @@ struct UsagePopoverView: View {
 
     private var statusDot: some View {
         let color: Color
+        var warn = false
         switch store.state {
         case .loading:   color = .yellow
         case .needsLogin: color = .gray
-        case .loaded(let u): color = u.sessionPercent >= warnThreshold ? .orange : .green
+        case .loaded(let u):
+            warn = u.sessionPercent >= warnThreshold
+            color = warn ? .orange : .green
         case .error:     color = .red
         }
-        return Circle().fill(color).frame(width: 8, height: 8)
+        // A symbol rather than a Circle so it can breathe when you're over the
+        // warning threshold; visually identical otherwise.
+        return Image(systemName: "circle.fill")
+            .font(.system(size: 8))
+            .foregroundStyle(color)
+            .pulsing(warn)
+    }
+
+    /// A section heading: a small tertiary symbol plus its label. The fixed icon
+    /// width keeps every heading's text on the same left edge.
+    private func sectionLabel(_ symbol: String, _ title: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: symbol)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .frame(width: 11)
+            Text(title).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    /// The same idea at settings-row scale.
+    private func settingLabel(_ symbol: String, _ title: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: symbol)
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .frame(width: 13)
+            Text(title).foregroundStyle(.secondary)
+        }
     }
 
     // MARK: - Bodies
@@ -106,7 +137,7 @@ struct UsagePopoverView: View {
     private func loadedBody(_ usage: Usage) -> some View {
         let sessionSeries = store.history.map { Double($0.sessionPercent) }
         return VStack(alignment: .leading, spacing: 8) {
-            usageBlock(title: "Session",
+            usageBlock(icon: "hourglass", title: "Session",
                        percent: usage.sessionPercent,
                        reset: usage.sessionReset)
 
@@ -115,7 +146,7 @@ struct UsagePopoverView: View {
 
             if let weekly = usage.weeklyPercent {
                 Divider()
-                usageBlock(title: "Weekly",
+                usageBlock(icon: "calendar", title: "Weekly",
                            percent: weekly,
                            reset: usage.weeklyReset)
             }
@@ -123,7 +154,7 @@ struct UsagePopoverView: View {
             if let models = usage.perModel, !models.isEmpty {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("By model").font(.caption).foregroundStyle(.secondary)
+                    sectionLabel("cpu", "By model")
                     ForEach(models) { model in
                         HStack {
                             Text(model.modelName).font(.callout)
@@ -161,11 +192,11 @@ struct UsagePopoverView: View {
 
     // MARK: - Reusable usage block (percent + bar + reset)
 
-    private func usageBlock(title: String, percent: Int, reset: Date?) -> some View {
+    private func usageBlock(icon: String, title: String, percent: Int, reset: Date?) -> some View {
         let warn = percent >= warnThreshold
         return VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
-                Text(title).font(.caption).foregroundStyle(.secondary)
+                sectionLabel(icon, title)
                 Spacer()
                 Text("\(percent)%")
                     .font(.title3).fontWeight(.semibold).monospacedDigit()
@@ -186,7 +217,7 @@ struct UsagePopoverView: View {
     private func creditsBlock(_ credits: CreditUsage) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Credits").font(.caption).foregroundStyle(.secondary)
+                sectionLabel("creditcard", "Credits")
                 Spacer()
                 Text(money(credits.used, credits.currency))
                     .font(.title3).fontWeight(.semibold).monospacedDigit()
@@ -217,7 +248,7 @@ struct UsagePopoverView: View {
 
     private var menuBarModeRow: some View {
         HStack(spacing: 6) {
-            Text("Menu bar").font(.caption).foregroundStyle(.secondary)
+            sectionLabel("menubar.rectangle", "Menu bar")
             Spacer()
             Picker("", selection: $settings.menuBarMode) {
                 ForEach(MenuBarMode.allCases) { mode in
@@ -234,10 +265,10 @@ struct UsagePopoverView: View {
 
     private var settingsPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Toggle("Launch at login", isOn: $settings.launchAtLogin)
-            Toggle("Show in Dock", isOn: $settings.showInDock)
+            Toggle(isOn: $settings.launchAtLogin) { settingLabel("power", "Launch at login") }
+            Toggle(isOn: $settings.showInDock) { settingLabel("dock.rectangle", "Show in Dock") }
             HStack {
-                Text("Menu bar color").foregroundStyle(.secondary)
+                settingLabel("paintpalette", "Menu bar color")
                 Spacer()
                 Picker("", selection: $settings.menuBarColor) {
                     ForEach(MenuBarColor.allCases) { color in
@@ -247,7 +278,7 @@ struct UsagePopoverView: View {
                 .labelsHidden().fixedSize()
             }
             HStack {
-                Text("Refresh every").foregroundStyle(.secondary)
+                settingLabel("arrow.clockwise", "Refresh every")
                 Spacer()
                 Picker("", selection: $settings.refreshIntervalMinutes) {
                     ForEach(AppSettings.refreshChoices, id: \.self) { minutes in
@@ -256,8 +287,9 @@ struct UsagePopoverView: View {
                 }
                 .labelsHidden().fixedSize()
             }
-            Stepper("Warning at \(settings.warnThreshold)%",
-                    value: $settings.warnThreshold, in: 50...95, step: 5)
+            Stepper(value: $settings.warnThreshold, in: 50...95, step: 5) {
+                settingLabel("exclamationmark.triangle", "Warning at \(settings.warnThreshold)%")
+            }
             Button("Sign out", role: .destructive, action: onSignOut)
                 .padding(.top, 2)
         }
@@ -269,7 +301,11 @@ struct UsagePopoverView: View {
     private var footer: some View {
         HStack {
             Button(action: onRefresh) {
-                Label("Refresh", systemImage: "arrow.clockwise")
+                Label {
+                    Text("Refresh")
+                } icon: {
+                    Image(systemName: "arrow.clockwise").spinning(store.isRefreshing)
+                }
             }
             Spacer()
             Button {
@@ -380,4 +416,39 @@ private struct SparklineView: View {
             return CGPoint(x: x, y: y)
         }
     }
+}
+
+// MARK: - Symbol effects
+
+/// Symbol effects arrived in macOS 14 and `.rotate` in macOS 15, so these wrap
+/// the availability dance and simply don't animate on macOS 13.
+private struct SpinWhileActive: ViewModifier {
+    let active: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.symbolEffect(.rotate, options: .repeating, isActive: active)
+        } else if #available(macOS 14.0, *) {
+            content.symbolEffect(.pulse, options: .repeating, isActive: active)
+        } else {
+            content
+        }
+    }
+}
+
+private struct PulseWhileActive: ViewModifier {
+    let active: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(macOS 14.0, *) {
+            content.symbolEffect(.pulse, options: .repeating, isActive: active)
+        } else {
+            content
+        }
+    }
+}
+
+private extension View {
+    /// Spins while a refresh is actually in flight.
+    func spinning(_ active: Bool) -> some View { modifier(SpinWhileActive(active: active)) }
+    /// Breathes while the value is over the warning threshold.
+    func pulsing(_ active: Bool) -> some View { modifier(PulseWhileActive(active: active)) }
 }
