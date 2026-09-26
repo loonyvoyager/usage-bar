@@ -5,17 +5,6 @@ Notable changes to UsageBar. Format loosely follows
 
 ## [Unreleased]
 
-### Added
-- **Signal** menu-bar style — an SF Symbol filled to your live percentage (SF
-  Symbols' variable value) with the number beside it, next to Meters and
-  `% / time left`.
-- SF Symbols through the dropdown: Session, Weekly, By model and Credits get
-  section icons, and every settings row is labelled with one.
-- The **Refresh** button now spins while a refresh is actually in flight — it
-  previously gave no feedback at all once data was on screen — and the status
-  dot breathes while you're over the warning threshold. (Symbol effects need
-  macOS 14; on 13 they simply sit still.)
-
 ### Changed
 - Dock ring redrawn to match Codex's own: the number sits at the ring's center
   and the `%` sits on the ring band below it. The ring now **breaks around the

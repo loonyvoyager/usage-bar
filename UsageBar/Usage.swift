@@ -81,11 +81,6 @@ enum UsageState: Equatable {
 final class UsageStore: ObservableObject {
     @Published private(set) var state: UsageState = .needsLogin
 
-    /// True while a refresh is in flight. Distinct from `.loading`, which only
-    /// covers the first load — this lets the panel show that a manual refresh is
-    /// doing something even when good data is already on screen.
-    @Published var isRefreshing = false
-
     /// In-memory ring buffer of recent samples (Phase 2 sparkline). Not persisted.
     @Published private(set) var history: [Usage] = []
     private let historyCap = 60
@@ -112,9 +107,6 @@ enum MenuBarMode: String, CaseIterable, Identifiable {
     /// Compact meters: each window's % stacked over a small segmented bar —
     /// session, plus weekly when the endpoint provides it.
     case meters
-    /// An SF Symbol filled to the current percentage (variable value), with the
-    /// number beside it.
-    case signal
     /// "14%/3h29m" text, no icon.
     case percentTime
 
@@ -122,7 +114,6 @@ enum MenuBarMode: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .meters: return "Meters"
-        case .signal: return "Signal"
         case .percentTime: return "% / time left"
         }
     }
